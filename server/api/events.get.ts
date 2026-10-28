@@ -112,16 +112,24 @@ async function loadFeed(): Promise<EventFeed> {
 export default defineEventHandler(async (event): Promise<EventFeed> => {
   setHeader(event, "Cache-Control", "no-store");
   const scope = getQuery(event).scope;
-  const present = (feed: EventFeed): EventFeed =>
-    scope === "bilateral" || scope === "state"
+  const present = (feed: EventFeed): EventFeed => ({
+    ...feed,
+    ...(feed.coverage
       ? {
-          ...feed,
-          events: feed.events.filter(
+          coverage: {
+            ...feed.coverage,
+            persistence: process.env.VERCEL ? "ephemeral" : "persistent",
+          },
+        }
+      : {}),
+    events:
+      scope === "bilateral" || scope === "state"
+        ? feed.events.filter(
             (item) =>
               !!item.countryPair && (scope !== "state" || item.stateLinked),
-          ),
-        }
-      : feed;
+          )
+        : feed.events,
+  });
   const config = useRuntimeConfig(event);
   if (
     getQuery(event).demo === "true" ||

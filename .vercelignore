@@ -1,0 +1,9 @@
+.git
+.data
+.tools
+.output
+.nuxt
+node_modules
+.env
+.env.*
+!.env.example

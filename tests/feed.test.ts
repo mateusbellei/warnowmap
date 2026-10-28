@@ -30,13 +30,37 @@ beforeEach(() => {
   vi.stubGlobal("useStorage", () => storage);
   vi.stubGlobal("$fetch", fetchMock);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 async function handler() {
   return (await import("../server/api/events.get")).default as unknown as (
     event: object,
   ) => Promise<EventFeed>;
 }
 describe("API de relatos", () => {
+  it("explicita o histórico temporário da Vercel sem alterar o arquivo armazenado", async () => {
+    vi.stubEnv("VERCEL", "1");
+    stored = {
+      mode: "live",
+      events: [],
+      fetchedAt: "2026-10-28T12:00:00Z",
+      datasetAt: "2026-10-28T12:00:00Z",
+      provider: "GDELT 2.0",
+      message: "",
+      coverage: {
+        firstCollectedAt: "2026-10-28T12:00:00Z",
+        lastCollectedAt: "2026-10-28T12:00:00Z",
+        batches: 1,
+        retentionDays: 7,
+      },
+    };
+    fetchMock.mockRejectedValue(new Error("offline"));
+    const response = await (await handler())({});
+    expect(response.coverage?.persistence).toBe("ephemeral");
+    expect(stored.coverage?.persistence).toBeUndefined();
+  });
   it("enriquece o arquivo anterior com economia mesmo com o provedor indisponível", async () => {
     stored = {
       mode: "live",

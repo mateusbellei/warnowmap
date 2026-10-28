@@ -25,9 +25,15 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
-    preset: "node-server",
+    preset: process.env.VERCEL ? "vercel" : "node-server",
     compressPublicAssets: true,
-    storage: { data: { driver: "fs", base: "./.data/kv" } },
+    storage: {
+      data: {
+        driver: "fs",
+        base: process.env.VERCEL ? "/tmp/warnowmap/kv" : "./.data/kv",
+      },
+    },
+    vercel: { functions: { maxDuration: 60 } },
   },
   vite: { optimizeDeps: { include: ["@lucide/vue", "maplibre-gl"] } },
 });

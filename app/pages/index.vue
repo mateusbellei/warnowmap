@@ -967,7 +967,11 @@ onBeforeUnmount(() => {
                 }}
                 desde {{ formatDate(feed.coverage.firstCollectedAt, true) }} ·
                 retenção de até 7 dias / 15 mil relatos. Dias vazios podem
-                refletir lacunas de coleta.</span
+                refletir lacunas de coleta.
+                <template v-if="feed.coverage.persistence === 'ephemeral'">
+                  Histórico temporário por instância; pode reiniciar na
+                  Vercel.</template
+                ></span
               ><span v-else
                 >Aguardando cobertura da primeira coleta. O histórico não é
                 retroativo.</span

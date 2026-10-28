@@ -51,6 +51,7 @@ export interface EventFeed {
     lastCollectedAt: string;
     batches: number;
     retentionDays: number;
+    persistence?: "ephemeral" | "persistent";
     batchDates?: string[];
   };
 }

@@ -69,10 +69,12 @@ docs/ANALISE.md                        Diagnóstico e decisões
 
 ## Operação e limites
 
+Na Vercel, `vercel.json` seleciona Nuxt e o build usa o preset Nitro `vercel`, com funções de até 60 segundos. O arquivo das coletas usa `/tmp/warnowmap/kv`, o diretório gravável do ambiente serverless. Esse histórico é **temporário e não compartilhado entre instâncias**: pode reiniciar após inatividade, escala ou deploy. A API informa `coverage.persistence=ephemeral` e a interface explicita a limitação. Não há banco persistente provisionado. Em servidor Node local, o arquivo continua em `.data/kv`.
+
 O build usa o preset Node server do Nitro. Mantenha um volume gravável em `.data/kv` e HTTPS no proxy de produção. Há arquivo local limitado dos lotes coletados; não há worker independente, ingestão contínua sem usuários, banco histórico dedicado, autenticação administrativa, revisão editorial ou cache distribuído entre réplicas. A interface carrega o shell antes de consultar o feed e renderiza a cronologia em blocos de 40 itens. Tiles públicos não oferecem SLA contratado. Para escalar, adote ingestão programada, PostgreSQL/PostGIS/Redis e hospedagem de tiles adequada ao tráfego.
 
 Não há segredos necessários. Endpoints externos são fixos, as fontes permitem somente HTTP(S), e dados do provedor nunca são renderizados como HTML.
 
 Na auditoria da migração foram corrigidas as ocorrências de severidade alta. Restam sete de severidade baixa na cadeia Nuxt/Nitro/Rollup ligada a `deepmerge` 4.3.1, última versão disponível na consulta. Não foi aplicado o downgrade do Nuxt proposto por `audit --force`. Consulte `npm audit` para acompanhar correções upstream.
 
-O conector GitHub não teve acesso ao remoto `m7bellei/warnowmap` na migração inicial. A evolução de diplomacia e linha do tempo está em `feat/diplomacy-timeline`; o foco visual no mapa está em `feat/map-first-monitor`; a camada econômica está em `feat/economic-impacts`. São branches locais; não foi publicado PR nem realizado deploy. Consulte `docs/MAPA.md` para a leitura visual, `docs/DIPLOMACIA.md` para o histórico e as relações bilaterais e `ECONOMIA.md` para os sinais econômicos.
+O repositório atual é [mateusbellei/warnowmap](https://github.com/mateusbellei/warnowmap); o endereço antigo redireciona para ele. A integração das evoluções e a atualização da Vercel são rastreadas pela [issue #1](https://github.com/mateusbellei/warnowmap/issues/1). Consulte `docs/MAPA.md` para a leitura visual, `docs/DIPLOMACIA.md` para o histórico e as relações bilaterais e `ECONOMIA.md` para os sinais econômicos.
