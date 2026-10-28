@@ -1,4 +1,5 @@
 import type { ConflictEvent } from "../../shared/types/conflict";
+import { actorCountry } from "../utils/countries";
 // Cenários de interface; não são notícias, incidentes confirmados ou um retrato atual.
 const points: [string, string, number, number, ConflictEvent["kind"]][] = [
   ["Ucrânia", "Europa", 37.8, 48.5, "armed"],
@@ -16,7 +17,23 @@ const points: [string, string, number, number, ConflictEvent["kind"]][] = [
   ["Iêmen", "Oriente Médio", 44.2, 15.35, "armed"],
   ["Somália", "África", 45.34, 2.04, "violence"],
 ];
-export const demoEvents: ConflictEvent[] = points.map(
+const pairs = [
+  ["RUS", "UKR"],
+  ["ISR", "PSE"],
+  ["IRN", "USA"],
+  ["ISR", "LBN"],
+  ["SDN"],
+  ["COD"],
+  ["MLI"],
+  ["MMR"],
+  ["CHN", "TWN"],
+  ["PRK", "KOR"],
+  ["VEN", "GUY"],
+  ["USA", "CHN"],
+  ["YEM", "SAU"],
+  ["SOM"],
+];
+const baseEvents: ConflictEvent[] = points.map(
   ([location, region, lng, lat, kind], index) => ({
     id: `demo-${index}`,
     title: `Cenário de demonstração · ${location}`,
@@ -25,8 +42,13 @@ export const demoEvents: ConflictEvent[] = points.map(
     coordinates: [lng, lat],
     kind,
     actors: [],
-    reportedAt: "2024-04-06T12:00:00Z",
-    eventDate: "2024-04-06",
+    countries: pairs[index]!.map((code) => actorCountry(code)!),
+    countryPair:
+      pairs[index]!.length === 2 ? [...pairs[index]!].sort().join(":") : null,
+    stateLinked: true,
+    actionCode: kind === "armed" ? "19" : kind === "tension" ? "13" : "18",
+    reportedAt: `2024-04-0${1 + (index % 6)}T12:00:00Z`,
+    eventDate: `2024-04-0${1 + (index % 6)}`,
     source: "Dados ilustrativos",
     sourceUrl: "https://www.gdeltproject.org/",
     mentions: 0,
@@ -34,3 +56,16 @@ export const demoEvents: ConflictEvent[] = points.map(
     demo: true,
   }),
 );
+export const demoEvents: ConflictEvent[] = [
+  ...baseEvents,
+  ...[2, 0, 1, 8, 11, 12].map((point, index): ConflictEvent => ({
+    ...baseEvents[point]!,
+    id: `demo-diplomacy-${index}`,
+    title: "Simulação · Consulta e cooperação bilateral",
+    kind: "diplomacy",
+    military: false,
+    actionCode: "04",
+    reportedAt: `2024-04-0${1 + index}T16:00:00Z`,
+    eventDate: `2024-04-0${1 + index}`,
+  })),
+];

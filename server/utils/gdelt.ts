@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
+import { actorCountry } from "./countries";
 import type { ConflictEvent } from "../../shared/types/conflict";
 import {
   regionFromCoordinates,
@@ -6,6 +7,19 @@ import {
 } from "../../shared/utils/events";
 
 const labels: Record<string, string> = {
+  "02": "Apelo relatado",
+  "03": "Intenção de cooperação relatada",
+  "04": "Consulta ou negociação relatada",
+  "05": "Cooperação diplomática relatada",
+  "06": "Cooperação material relatada",
+  "07": "Ajuda relatada",
+  "08": "Concessão relatada",
+  "10": "Exigência relatada",
+  "11": "Reprovação relatada",
+  "12": "Rejeição relatada",
+  "13": "Ameaça relatada",
+  "15": "Demonstração de força relatada",
+  "16": "Redução de relações relatada",
   "17": "Coerção relatada",
   "18": "Violência relatada",
   "19": "Confronto armado relatado",
@@ -48,6 +62,25 @@ export function parseGdeltExport(text: string): ConflictEvent[] {
       continue;
     const location = row[52]?.trim() || "Localização aproximada";
     const root = row[28]!;
+    const countries = [actorCountry(row[7]!), actorCountry(row[17]!)].filter(
+      (country): country is NonNullable<typeof country> => !!country,
+    );
+    const uniqueCountries = [
+      ...new Map(countries.map((country) => [country.code, country])).values(),
+    ];
+    const countryPair =
+      uniqueCountries.length === 2
+        ? uniqueCountries
+            .map((country) => country.code)
+            .sort()
+            .join(":")
+        : null;
+    const stateLinked =
+      [row[12], row[13], row[14], row[22], row[23], row[24]].some((code) =>
+        /^(GOV|MIL|ELI)$/.test(code ?? ""),
+      ) ||
+      [5, 15].some((index) => !!row[index] && row[index] === row[index + 2]);
+    const diplomacy = ["02", "03", "04", "05", "06", "07", "08"].includes(root);
     const actors = [
       ...new Set(
         [row[6], row[16]].filter((actor): actor is string => !!actor?.trim()),
@@ -55,12 +88,22 @@ export function parseGdeltExport(text: string): ConflictEvent[] {
     ];
     events.set(row[0]!, {
       id: row[0]!,
-      title: `${labels[root]} · ${location}`,
+      title: labels[root]!,
       location,
       coordinates: [lng, lat],
       region: regionFromCoordinates(lng, lat),
-      kind: root === "19" ? "armed" : root === "17" ? "tension" : "violence",
+      kind: diplomacy
+        ? "diplomacy"
+        : root === "19"
+          ? "armed"
+          : ["18", "20"].includes(root)
+            ? "violence"
+            : "tension",
       actors,
+      countries: uniqueCountries,
+      countryPair,
+      stateLinked,
+      actionCode: row[26]?.trim() || root,
       reportedAt,
       eventDate: `${row[1]!.slice(0, 4)}-${row[1]!.slice(4, 6)}-${row[1]!.slice(6, 8)}`,
       source: new URL(url).hostname.replace(/^www\./, ""),
@@ -82,12 +125,19 @@ export function parseGdeltExport(text: string): ConflictEvent[] {
       event.coordinates.join(","),
       event.kind,
       event.eventDate,
+      event.countryPair ??
+        event.countries
+          .map((country) => country.code)
+          .sort()
+          .join(":"),
+      event.actionCode,
     ].join("|");
     const previous = grouped.get(key);
     if (!previous) grouped.set(key, event);
     else {
       previous.actors = [...new Set([...previous.actors, ...event.actors])];
       previous.military ||= event.military;
+      previous.stateLinked ||= event.stateLinked;
       previous.mentions = Math.max(previous.mentions, event.mentions);
       if (event.reportedAt > previous.reportedAt)
         previous.reportedAt = event.reportedAt;
@@ -98,7 +148,7 @@ export function parseGdeltExport(text: string): ConflictEvent[] {
       (a, b) =>
         b.reportedAt.localeCompare(a.reportedAt) || Number(b.id) - Number(a.id),
     )
-    .slice(0, 2000);
+    .slice(0, 5000);
 }
 
 export function getExportUrl(manifest: string): { url: string; date: string } {

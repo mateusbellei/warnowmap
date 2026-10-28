@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { strToU8, zipSync } from "fflate";
 import type { EventFeed } from "../shared/types/conflict";
+import { demoEvents } from "../server/data/demo";
 
 let stored: EventFeed | null;
 let query: Record<string, string>;
@@ -50,6 +51,18 @@ describe("API de relatos", () => {
     expect(response.events.every((event) => event.demo)).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it("reduz o payload bilateral sem alterar o arquivo completo das coletas", async () => {
+    query.demo = "true";
+    query.scope = "state";
+    const api = await handler();
+    const scoped = await api({});
+    expect(scoped.events.length).toBeGreaterThan(0);
+    expect(
+      scoped.events.every((event) => !!event.countryPair && event.stateLinked),
+    ).toBe(true);
+    query.scope = "all";
+    expect((await api({})).events.length).toBeGreaterThan(scoped.events.length);
+  });
   it("mantém a última coleta com aviso se a fonte falhar", async () => {
     stored = {
       mode: "live",
@@ -92,5 +105,39 @@ describe("API de relatos", () => {
         zipSync({ "20240101000000.export.CSV": strToU8("") }).buffer,
       );
     expect((await (await handler())({})).mode).toBe("stale");
+  });
+  it("preserva o histórico entre lotes, limita a retenção e contabiliza datas de lote únicas", async () => {
+    const date = stamp();
+    const currentTime = new Date().toISOString();
+    const previousTime = new Date(Date.now() - 900000).toISOString();
+    stored = {
+      mode: "live",
+      events: [{ ...demoEvents[0]!, demo: false, reportedAt: previousTime }],
+      fetchedAt: previousTime,
+      datasetAt: previousTime,
+      provider: "GDELT 2.0",
+      message: "",
+      coverage: {
+        firstCollectedAt: previousTime,
+        lastCollectedAt: previousTime,
+        batches: 1,
+        retentionDays: 7,
+        batchDates: [previousTime],
+      },
+    };
+    fetchMock
+      .mockResolvedValueOnce(
+        `100 hash http://data.gdeltproject.org/gdeltv2/${date}.export.CSV.zip`,
+      )
+      .mockResolvedValueOnce(
+        zipSync({ [`${date}.export.CSV`]: strToU8("") }).buffer,
+      );
+    const result = await (await handler())({});
+    expect(result.events).toHaveLength(1);
+    expect(result.coverage?.batches).toBe(2);
+    expect(result.coverage?.firstCollectedAt).toBe(previousTime);
+    expect(Date.parse(result.coverage!.lastCollectedAt)).toBeGreaterThanOrEqual(
+      Date.parse(currentTime),
+    );
   });
 });

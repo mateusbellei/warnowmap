@@ -9,6 +9,10 @@ export function filterEvents(
     hours: number;
     now: number;
     militaryOnly?: boolean;
+    interstateOnly?: boolean;
+    stateOnly?: boolean;
+    country?: string;
+    pair?: string;
   },
 ) {
   const search = filters.search
@@ -17,7 +21,12 @@ export function filterEvents(
     .toLowerCase()
     .trim();
   return events.filter((event) => {
-    const text = [event.title, event.location, ...event.actors]
+    const text = [
+      event.title,
+      event.location,
+      ...event.actors,
+      ...event.countries.map((country) => country.name),
+    ]
       .join(" ")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -25,6 +34,11 @@ export function filterEvents(
     const age = filters.now - Date.parse(event.reportedAt);
     return (
       (!filters.militaryOnly || event.military) &&
+      (!filters.interstateOnly || !!event.countryPair) &&
+      (!filters.stateOnly || event.stateLinked) &&
+      (!filters.country ||
+        event.countries.some((country) => country.code === filters.country)) &&
+      (!filters.pair || event.countryPair === filters.pair) &&
       (!search || text.includes(search)) &&
       (filters.region === "Todas as regiões" ||
         event.region === filters.region) &&

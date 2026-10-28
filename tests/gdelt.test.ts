@@ -13,8 +13,10 @@ function row(overrides: Record<number, string> = {}) {
     0: "123456",
     1: "20261028",
     6: "ACTOR A",
+    7: "USA",
     12: "MIL",
     16: "ACTOR B",
+    17: "IRN",
     28: "19",
     31: "3",
     51: "4",
@@ -84,6 +86,36 @@ describe("normalização do GDELT", () => {
   it("rejeita timestamps impossíveis", () => {
     expect(parseGdeltDate("20260230120000")).toBeNull();
     expect(parseGdeltDate("20261028150000")).toBe("2026-10-28T15:00:00Z");
+  });
+  it("inclui consultas e cooperação sem exigir atores militares", () => {
+    const [event] = parseGdeltExport(row({ 12: "GOV", 26: "040", 28: "04" }));
+    expect(event).toMatchObject({
+      kind: "diplomacy",
+      military: false,
+      countryPair: "IRN:USA",
+      stateLinked: true,
+      actionCode: "040",
+    });
+    expect(event?.countries.map((country) => country.code)).toEqual([
+      "USA",
+      "IRN",
+    ]);
+    expect(event?.countries[0]?.name).toBe("Estados Unidos");
+  });
+  it("não deduz guerra entre países a partir do local ou de um único ator", () => {
+    expect(
+      parseGdeltExport(row({ 7: "USA", 17: "USA" }))[0]?.countryPair,
+    ).toBeNull();
+    expect(parseGdeltExport(row({ 7: "", 17: "EUN" }))[0]?.countries).toEqual(
+      [],
+    );
+  });
+  it("preserva pares diferentes do mesmo artigo e distingue ameaças de diplomacia", () => {
+    const parsed = parseGdeltExport(
+      [row(), row({ 0: "123457", 17: "CHN" })].join("\n"),
+    );
+    expect(parsed).toHaveLength(2);
+    expect(parseGdeltExport(row({ 28: "13" }))[0]?.kind).toBe("tension");
   });
   it("extrai apenas o CSV de eventos do arquivo zip", () => {
     const zip = zipSync({

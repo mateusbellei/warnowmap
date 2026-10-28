@@ -7,7 +7,11 @@ export const regions = [
   "Américas",
 ] as const;
 export type Region = (typeof regions)[number];
-export type EventKind = "armed" | "violence" | "tension";
+export type EventKind = "armed" | "violence" | "tension" | "diplomacy";
+export interface CountryRef {
+  code: string;
+  name: string;
+}
 export interface ConflictEvent {
   id: string;
   title: string;
@@ -16,6 +20,10 @@ export interface ConflictEvent {
   coordinates: [number, number];
   kind: EventKind;
   actors: string[];
+  countries: CountryRef[];
+  countryPair: string | null;
+  stateLinked: boolean;
+  actionCode: string;
   reportedAt: string;
   eventDate: string;
   source: string;
@@ -31,9 +39,17 @@ export interface EventFeed {
   datasetAt: string | null;
   message: string;
   provider: "GDELT 2.0" | "Demonstração";
+  coverage?: {
+    firstCollectedAt: string;
+    lastCollectedAt: string;
+    batches: number;
+    retentionDays: number;
+    batchDates?: string[];
+  };
 }
 export const kindLabels: Record<EventKind, string> = {
   armed: "Confronto armado",
   violence: "Violência",
   tension: "Coerção e tensão",
+  diplomacy: "Diplomacia",
 };

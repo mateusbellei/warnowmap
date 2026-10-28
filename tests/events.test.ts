@@ -5,8 +5,8 @@ import { demoEvents } from "../server/data/demo";
 const defaults = {
   search: "",
   region: "Todas as regiões" as const,
-  kinds: ["armed", "violence", "tension"] as (
-    "armed" | "violence" | "tension"
+  kinds: ["armed", "violence", "tension", "diplomacy"] as (
+    "armed" | "violence" | "tension" | "diplomacy"
   )[],
   hours: 24,
   now: Date.parse("2026-10-28T16:00:00Z"),
