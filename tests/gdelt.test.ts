@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { zipSync, strToU8 } from "fflate";
 import {
   decodeExport,
+  exportCandidates,
   getExportUrl,
   parseGdeltDate,
   parseGdeltExport,
@@ -30,6 +31,15 @@ function row(overrides: Record<number, string> = {}) {
   return fields.join("\t");
 }
 describe("normalização do GDELT", () => {
+  it("limita alternativas a três horas em intervalos de 15 minutos e mantém o host fixo", () => {
+    const candidates = exportCandidates("2026-10-28T01:00:00Z");
+    expect(candidates).toHaveLength(13);
+    expect(candidates[0]?.url).toBe(
+      "https://data.gdeltproject.org/gdeltv2/20261028010000.export.CSV.zip",
+    );
+    expect(candidates[12]?.date).toBe("2026-10-27T22:00:00.000Z");
+    expect(() => exportCandidates("invalid")).toThrow();
+  });
   it("atribui economia apenas com códigos específicos preservando a categoria original", () => {
     expect(parseGdeltExport(row({ 26: "163", 28: "16" }))[0]).toMatchObject({
       kind: "tension",

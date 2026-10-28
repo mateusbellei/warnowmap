@@ -165,6 +165,22 @@ export function getExportUrl(manifest: string): { url: string; date: string } {
   };
 }
 
+export function exportCandidates(
+  date: string,
+): { url: string; date: string }[] {
+  const time = Date.parse(date);
+  if (!Number.isFinite(time)) throw new Error("Data de lote inválida");
+  // Até três horas de atraso de publicação, sem trocar o host nem inventar datas de coleta.
+  return Array.from({ length: 13 }, (_, index) => {
+    const date = new Date(time - index * 900000).toISOString();
+    const stamp = date.replace(/[-:TZ.]/g, "").slice(0, 14);
+    return {
+      date,
+      url: `https://data.gdeltproject.org/gdeltv2/${stamp}.export.CSV.zip`,
+    };
+  });
+}
+
 export function decodeExport(bytes: Uint8Array): string {
   const files = unzipSync(bytes, {
     filter: (file) =>

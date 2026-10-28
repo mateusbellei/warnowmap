@@ -1,6 +1,11 @@
 import type { EventFeed } from "../../shared/types/conflict";
 import { demoEvents } from "../data/demo";
-import { decodeExport, getExportUrl, parseGdeltExport } from "../utils/gdelt";
+import {
+  decodeExport,
+  exportCandidates,
+  getExportUrl,
+  parseGdeltExport,
+} from "../utils/gdelt";
 import { mergeHistory } from "../../shared/utils/timeline";
 import { actorCountry } from "../utils/countries";
 import { economicImpact } from "../../shared/utils/economy";
@@ -22,12 +27,15 @@ let cached: { expires: number; feed: EventFeed } | undefined;
 
 async function loadFeed(): Promise<EventFeed> {
   const storage = useStorage("data");
+  let stage = "manifest";
   try {
     const manifest = await $fetch<string>(
       "https://data.gdeltproject.org/gdeltv2/lastupdate.txt",
-      { timeout: 12000, retry: 1, responseType: "text" },
+      { timeout: 8000, retry: 0, responseType: "text" },
     );
-    const { url, date } = getExportUrl(manifest);
+    let { date } = getExportUrl(manifest);
+    date = new Date(date).toISOString();
+    stage = "read-history";
     const previous = normalizeCountryNames(
       await storage.getItem<EventFeed>("events:v3:last"),
     );
@@ -37,11 +45,23 @@ async function loadFeed(): Promise<EventFeed> {
       Date.now() - Date.parse(date) < 3600000
     )
       return previous;
-    const archive = await $fetch<ArrayBuffer>(url, {
-      timeout: 20000,
-      retry: 1,
-      responseType: "arrayBuffer",
-    });
+    stage = "archive";
+    let archive: ArrayBuffer | undefined;
+    for (const candidate of exportCandidates(date)) {
+      try {
+        archive = await $fetch<ArrayBuffer>(candidate.url, {
+          timeout: 3000,
+          retry: 0,
+          responseType: "arrayBuffer",
+        });
+        date = candidate.date;
+        break;
+      } catch (error) {
+        if ((error as { statusCode?: number }).statusCode !== 404) throw error;
+      }
+    }
+    if (!archive)
+      throw new Error("Nenhum lote publicado nas últimas três horas");
     if (archive.byteLength > 10_000_000)
       throw new Error("Arquivo muito grande");
     const batchDates = [
@@ -57,6 +77,7 @@ async function loadFeed(): Promise<EventFeed> {
           Date.parse(value) <= Date.now() + 900000,
       )
       .sort();
+    stage = "decode";
     const feed: EventFeed = {
       events: mergeHistory(
         previous?.events ?? [],
@@ -84,9 +105,22 @@ async function loadFeed(): Promise<EventFeed> {
         batchDates,
       },
     };
+    stage = "persist";
     await storage.setItem("events:v3:last", feed);
     return feed;
-  } catch {
+  } catch (error) {
+    const diagnostic = error as {
+      name?: string;
+      code?: string;
+      statusCode?: number;
+      cause?: { code?: string };
+    };
+    console.warn("GDELT: coleta indisponível", {
+      stage,
+      name: diagnostic?.name,
+      code: diagnostic?.cause?.code ?? diagnostic?.code,
+      status: diagnostic?.statusCode,
+    });
     const previous = normalizeCountryNames(
       await storage.getItem<EventFeed>("events:v3:last").catch(() => null),
     );

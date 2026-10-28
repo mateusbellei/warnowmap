@@ -40,6 +40,21 @@ async function handler() {
   ) => Promise<EventFeed>;
 }
 describe("API de relatos", () => {
+  it("usa a data do lote anterior quando o arquivo do manifesto ainda retorna 404", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        "100 hash http://data.gdeltproject.org/gdeltv2/20261028194500.export.CSV.zip",
+      )
+      .mockRejectedValueOnce({ statusCode: 404 })
+      .mockResolvedValueOnce(
+        zipSync({ "20261028193000.export.CSV": strToU8("") }).buffer,
+      );
+    const response = await (await handler())({});
+    expect(response.datasetAt).toBe("2026-10-28T19:30:00.000Z");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      "https://data.gdeltproject.org/gdeltv2/20261028193000.export.CSV.zip",
+    );
+  });
   it("explicita o histórico temporário da Vercel sem alterar o arquivo armazenado", async () => {
     vi.stubEnv("VERCEL", "1");
     stored = {
