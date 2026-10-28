@@ -4,6 +4,8 @@ O mapa passa a ser o ponto de entrada em desktop e celular. A cronologia ocupa u
 
 ## Leitura visual
 
+O bloco “Conflitos em destaque” dá maior hierarquia aos confrontos armados e à violência, com contagens do recorte atual. “Focar conflitos” seleciona essas duas categorias e retorna à visualização do mapa; “Ver todas as categorias” restaura as quatro. Os demais filtros são preservados, inclusive Economia. O foco pode ser compartilhado com `?focus=conflicts`. Pontos dessas categorias recebem ícones e halos maiores; a cronologia usa bordas e fundos correspondentes. O destaque não representa gravidade, confirmação editorial ou contagem de guerras.
+
 - Confronto: losango com alvo; violência: triângulo com alerta; tensão: hexágono com raio; diplomacia: balões de diálogo. Os ícones são desenhados localmente e não dependem só da cor.
 - Os agrupamentos usam anéis proporcionais às quatro categorias. O número central é o **total de relatos**, não a quantidade de confrontos. O hover mostra a composição numérica, e o clique amplia o agrupamento.
 - O relato selecionado recebe uma camada independente de destaque, permanecendo visível mesmo quando sua posição pertence a um agrupamento.

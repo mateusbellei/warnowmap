@@ -144,7 +144,13 @@ function addLayers() {
     source: "events",
     filter: ["!", ["has", "point_count"]],
     paint: {
-      "circle-radius": 16,
+      "circle-radius": [
+        "match",
+        ["get", "kind"],
+        ["armed", "violence"],
+        20,
+        14,
+      ],
       "circle-color": [
         "match",
         ["get", "kind"],
@@ -156,7 +162,13 @@ function addLayers() {
         "#8cbea3",
         "#79a6ba",
       ],
-      "circle-opacity": 0.13,
+      "circle-opacity": [
+        "match",
+        ["get", "kind"],
+        ["armed", "violence"],
+        0.24,
+        0.13,
+      ],
       "circle-stroke-width": 1,
       "circle-stroke-color": [
         "match",
@@ -179,7 +191,7 @@ function addLayers() {
     filter: ["!", ["has", "point_count"]],
     layout: {
       "icon-image": ["concat", "event-", ["get", "kind"]],
-      "icon-size": 0.9,
+      "icon-size": ["match", ["get", "kind"], ["armed", "violence"], 1.05, 0.9],
       "icon-allow-overlap": true,
     },
   });
