@@ -31,6 +31,7 @@ import {
   type Region,
 } from "#shared/types/conflict";
 import { filterEvents } from "#shared/utils/events";
+import { eventsInView, type MapBounds } from "#shared/utils/map";
 import {
   calendarDays,
   sortTimeline,
@@ -67,7 +68,9 @@ const paused = ref(false);
 const heatmap = ref(false);
 const showFilters = ref(false);
 const showAbout = ref(false);
-const mobileMap = ref(false);
+const mobileMap = ref(true);
+const onlyInView = ref(false);
+const mapBounds = shallowRef<MapBounds | null>(null);
 const selected = ref<string | null>(null);
 const aboutPanel = ref<HTMLDialogElement>();
 const {
@@ -128,6 +131,9 @@ const events = computed(() =>
     basis.value,
     order.value,
   ),
+);
+const timelineEvents = computed(() =>
+  onlyInView.value ? eventsInView(events.value, mapBounds.value) : events.value,
 );
 const dailyCounts = computed(
   () =>
@@ -233,6 +239,7 @@ function resetCursor() {
   playing.value = false;
 }
 function clearFilters() {
+  onlyInView.value = false;
   search.value = "";
   region.value = "Todas as regiões";
   country.value = "";
@@ -335,7 +342,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell diplomatic-shell">
+  <div class="app-shell diplomatic-shell map-first-shell">
     <a href="#main-content" class="skip-link">Pular para o conteúdo</a>
     <aside class="navigation-rail" aria-label="Navegação principal">
       <a class="rail-brand" href="/" aria-label="WarNow início"
@@ -395,7 +402,7 @@ onBeforeUnmount(() => {
         <section class="page-heading">
           <div>
             <div class="eyebrow"><span /> CONFRONTOS & DIPLOMACIA</div>
-            <h1>Entenda o que muda entre países.</h1>
+            <h1>O cenário global, no mapa.</h1>
             <p>
               Acompanhe confrontos, tensões e diálogo, acontecimento por
               acontecimento.
@@ -577,6 +584,168 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
+          <div
+            v-if="error || (feed && feed.mode !== 'live')"
+            class="feed-status-banner"
+            :class="feed?.mode"
+            role="status"
+          >
+            <Info :size="15" /><span>{{
+              error
+                ? "Falha ao consultar o servidor. Tente atualizar o feed."
+                : feed?.message
+            }}</span
+            ><button v-if="!isDemo" class="text-button" @click="demo = true">
+              Explorar demo <ArrowRight :size="13" /></button
+            ><button v-else class="text-button" @click="demo = false">
+              Consultar feed <ArrowRight :size="13" />
+            </button>
+          </div>
+
+          <div
+            class="diplomacy-layout"
+            :class="{ 'mobile-map': mobileMap, 'map-focused': mobileMap }"
+          >
+            <div class="timeline-column">
+              <div class="timeline-sort">
+                <span>{{
+                  interstateOnly
+                    ? "Atores de países distintos"
+                    : "Todos os atores"
+                }}</span
+                ><label
+                  >Ordem<select v-model="order" aria-label="Ordem cronológica">
+                    <option value="desc">Mais recentes</option>
+                    <option value="asc">Mais antigos</option>
+                  </select></label
+                >
+              </div>
+              <EventTimeline
+                :events="timelineEvents"
+                :selected="selected"
+                :basis="basis"
+                :loading="loading"
+                @select="choose"
+              />
+            </div>
+            <div class="map-section">
+              <ClientOnly
+                ><LazyConflictMap
+                  :events="events"
+                  :selected="selected"
+                  :heatmap="heatmap"
+                  @select="choose"
+                  @viewport="mapBounds = $event"
+                /><template #fallback
+                  ><div class="map-skeleton">
+                    <Globe2 :size="32" /><span>Preparando mapa global…</span>
+                  </div></template
+                ></ClientOnly
+              >
+              <div class="map-topline">
+                <span
+                  ><Globe2 :size="13" />MAPA GLOBAL ·
+                  {{ events.length }} RELATOS</span
+                >
+                <button
+                  class="area-filter"
+                  :class="{ toggled: onlyInView }"
+                  :aria-pressed="onlyInView"
+                  @click="onlyInView = !onlyInView"
+                >
+                  <Crosshair :size="13" />{{
+                    onlyInView
+                      ? `${timelineEvents.length} relatos nesta área`
+                      : "Filtrar pela área visível"
+                  }}</button
+                ><button
+                  :class="{ toggled: heatmap }"
+                  :aria-pressed="heatmap"
+                  @click="heatmap = !heatmap"
+                >
+                  <Layers :size="13" /> Densidade
+                </button>
+              </div>
+              <div class="map-coordinate">
+                {{ cutoff ? `ATÉ ${cutoff}` : "SEM RECORTE" }}
+                <span>•</span> WGS 84
+              </div>
+              <div class="map-reading-note">
+                Anéis: composição por categoria · número: total de relatos
+              </div>
+              <div class="map-legend">
+                <span><i class="armed" />Confronto</span
+                ><span><i class="diplomacy" />Diplomacia</span
+                ><span><i class="tension" />Tensão</span
+                ><span><i class="violence" />Violência</span>
+              </div>
+              <section
+                v-if="active"
+                class="event-detail"
+                aria-label="Detalhes do relato"
+              >
+                <div class="detail-top">
+                  <span class="event-category" :class="active.kind">{{
+                    kindLabels[active.kind]
+                  }}</span
+                  ><button
+                    class="icon-button"
+                    aria-label="Fechar detalhes"
+                    @click="selected = null"
+                  >
+                    <X :size="17" />
+                  </button>
+                </div>
+                <div v-if="active.countryPair" class="country-relation">
+                  <span>{{ active.countries[0]?.name }}</span
+                  ><span class="relation-link">↔</span
+                  ><span>{{ active.countries[1]?.name }}</span>
+                </div>
+                <h2>{{ active.title }}</h2>
+                <p>
+                  {{
+                    active.actors.length
+                      ? active.actors.join(" · ")
+                      : "Acontecimento ilustrativo, sem validade factual."
+                  }}
+                </p>
+                <dl>
+                  <div>
+                    <dt>Data do fato</dt>
+                    <dd>{{ formatDate(active.eventDate) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Entrada no feed</dt>
+                    <dd>{{ formatDate(active.reportedAt, true) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Local aproximado</dt>
+                    <dd>{{ active.location }}</dd>
+                  </div>
+                  <div>
+                    <dt>Classificação CAMEO</dt>
+                    <dd>{{ active.actionCode }}</dd>
+                  </div>
+                  <div>
+                    <dt>Revisão editorial</dt>
+                    <dd>
+                      {{ active.demo ? "Demonstração" : "Não realizada" }}
+                    </dd>
+                  </div>
+                </dl>
+                <a
+                  v-if="!active.demo"
+                  :href="active.sourceUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Ler fonte original <ExternalLink :size="14" /></a
+                ><small
+                  >Países indicam afiliação dos atores, não confirmação de ação
+                  estatal. Local aproximado.</small
+                >
+              </section>
+            </div>
+          </div>
           <section
             class="time-explorer"
             :class="{ 'show-time-inputs': showFilters }"
@@ -714,150 +883,6 @@ onBeforeUnmount(() => {
             </p>
           </section>
 
-          <div
-            v-if="error || (feed && feed.mode !== 'live')"
-            class="feed-status-banner"
-            :class="feed?.mode"
-            role="status"
-          >
-            <Info :size="15" /><span>{{
-              error
-                ? "Falha ao consultar o servidor. Tente atualizar o feed."
-                : feed?.message
-            }}</span
-            ><button v-if="!isDemo" class="text-button" @click="demo = true">
-              Explorar demo <ArrowRight :size="13" /></button
-            ><button v-else class="text-button" @click="demo = false">
-              Consultar feed <ArrowRight :size="13" />
-            </button>
-          </div>
-
-          <div
-            class="diplomacy-layout"
-            :class="{ 'mobile-map': mobileMap, 'map-focused': mobileMap }"
-          >
-            <div class="timeline-column">
-              <div class="timeline-sort">
-                <span>{{
-                  interstateOnly
-                    ? "Atores de países distintos"
-                    : "Todos os atores"
-                }}</span
-                ><label
-                  >Ordem<select v-model="order" aria-label="Ordem cronológica">
-                    <option value="desc">Mais recentes</option>
-                    <option value="asc">Mais antigos</option>
-                  </select></label
-                >
-              </div>
-              <EventTimeline
-                :events="events"
-                :selected="selected"
-                :basis="basis"
-                :loading="loading"
-                @select="choose"
-              />
-            </div>
-            <div class="map-section">
-              <ClientOnly
-                ><LazyConflictMap
-                  :events="events"
-                  :selected="selected"
-                  :heatmap="heatmap"
-                  @select="choose"
-                /><template #fallback
-                  ><div class="map-skeleton">
-                    <Globe2 :size="32" /><span>Preparando mapa global…</span>
-                  </div></template
-                ></ClientOnly
-              >
-              <div class="map-topline">
-                <span><Globe2 :size="13" />MAPA DO RECORTE</span
-                ><button
-                  :class="{ toggled: heatmap }"
-                  :aria-pressed="heatmap"
-                  @click="heatmap = !heatmap"
-                >
-                  <Layers :size="13" /> Densidade
-                </button>
-              </div>
-              <div class="map-coordinate">
-                {{ cutoff ? `ATÉ ${cutoff}` : "SEM RECORTE" }}
-                <span>•</span> WGS 84
-              </div>
-              <div class="map-legend">
-                <span><i class="armed" />Confronto</span
-                ><span><i class="diplomacy" />Diplomacia</span
-                ><span><i class="tension" />Tensão</span
-                ><span><i class="violence" />Violência</span>
-              </div>
-              <section
-                v-if="active"
-                class="event-detail"
-                aria-label="Detalhes do relato"
-              >
-                <div class="detail-top">
-                  <span class="event-category" :class="active.kind">{{
-                    kindLabels[active.kind]
-                  }}</span
-                  ><button
-                    class="icon-button"
-                    aria-label="Fechar detalhes"
-                    @click="selected = null"
-                  >
-                    <X :size="17" />
-                  </button>
-                </div>
-                <div v-if="active.countryPair" class="country-relation">
-                  <span>{{ active.countries[0]?.name }}</span
-                  ><span class="relation-link">↔</span
-                  ><span>{{ active.countries[1]?.name }}</span>
-                </div>
-                <h2>{{ active.title }}</h2>
-                <p>
-                  {{
-                    active.actors.length
-                      ? active.actors.join(" · ")
-                      : "Acontecimento ilustrativo, sem validade factual."
-                  }}
-                </p>
-                <dl>
-                  <div>
-                    <dt>Data do fato</dt>
-                    <dd>{{ formatDate(active.eventDate) }}</dd>
-                  </div>
-                  <div>
-                    <dt>Entrada no feed</dt>
-                    <dd>{{ formatDate(active.reportedAt, true) }}</dd>
-                  </div>
-                  <div>
-                    <dt>Local aproximado</dt>
-                    <dd>{{ active.location }}</dd>
-                  </div>
-                  <div>
-                    <dt>Classificação CAMEO</dt>
-                    <dd>{{ active.actionCode }}</dd>
-                  </div>
-                  <div>
-                    <dt>Revisão editorial</dt>
-                    <dd>
-                      {{ active.demo ? "Demonstração" : "Não realizada" }}
-                    </dd>
-                  </div>
-                </dl>
-                <a
-                  v-if="!active.demo"
-                  :href="active.sourceUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  >Ler fonte original <ExternalLink :size="14" /></a
-                ><small
-                  >Países indicam afiliação dos atores, não confirmação de ação
-                  estatal. Local aproximado.</small
-                >
-              </section>
-            </div>
-          </div>
           <div class="timeline-bar">
             <div>
               <span class="timeline-dot" /><strong>{{

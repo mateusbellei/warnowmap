@@ -1,6 +1,6 @@
 # WarNow
 
-Monitor global de **confrontos e diplomacia entre países**, com Nuxt 4, TypeScript, Nitro e MapLibre GL JS. Linha do tempo diária, histórico das coletas, relações bilaterais, filtros combináveis e mapa vetorial sincronizado, em português.
+Monitor global de **confrontos e diplomacia entre países**, com Nuxt 4, TypeScript, Nitro e MapLibre GL JS. O mapa é a visualização principal, com símbolos por categoria, agrupamentos proporcionais e linha do tempo sincronizada. Interface em português.
 
 ## Executar
 
@@ -51,9 +51,12 @@ app/components/ConflictMap.client.vue   Ciclo de vida do mapa WebGL
 app/components/EventTimeline.vue       Cronologia diária e carregamento em blocos
 app/assets/css/main.css                Sistema visual e breakpoints
 app/assets/css/diplomacy.css            Relações, eixo temporal e interface diplomática
+app/assets/css/map-first.css            Mapa principal, painel de contexto e disposição móvel
+app/utils/map-icons.ts                 Símbolos locais e anéis proporcionais dos agrupamentos
 shared/types/conflict.ts               Contratos compartilhados
 shared/utils/events.ts                 Busca, filtros e URLs
 shared/utils/timeline.ts               Ordenação, grupos diários, calendário e retenção
+shared/utils/map.ts                    Recorte geográfico e antimeridiano
 server/api/events.get.ts               API, cache e recuperação
 server/utils/gdelt.ts                  Extração ZIP e normalização
 server/utils/countries.ts              Códigos nacionais dos atores
@@ -70,4 +73,4 @@ Não há segredos necessários. Endpoints externos são fixos, as fontes permite
 
 Na auditoria da migração foram corrigidas as ocorrências de severidade alta. Restam sete de severidade baixa na cadeia Nuxt/Nitro/Rollup ligada a `deepmerge` 4.3.1, última versão disponível na consulta. Não foi aplicado o downgrade do Nuxt proposto por `audit --force`. Consulte `npm audit` para acompanhar correções upstream.
 
-O conector GitHub não teve acesso ao remoto `m7bellei/warnowmap` na migração inicial. A evolução de diplomacia e linha do tempo está na branch local `feat/diplomacy-timeline`; não foi publicado PR nem realizado deploy.
+O conector GitHub não teve acesso ao remoto `m7bellei/warnowmap` na migração inicial. A evolução de diplomacia e linha do tempo está em `feat/diplomacy-timeline`; o foco visual no mapa está em `feat/map-first-monitor`. São branches locais; não foi publicado PR nem realizado deploy. Consulte `docs/MAPA.md` para a leitura visual e `docs/DIPLOMACIA.md` para o histórico e as relações bilaterais.

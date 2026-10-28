@@ -1,7 +1,11 @@
 export default defineNuxtConfig({
   compatibilityDate: "2026-10-28",
   devtools: { enabled: false },
-  css: ["~/assets/css/main.css", "~/assets/css/diplomacy.css"],
+  css: [
+    "~/assets/css/main.css",
+    "~/assets/css/diplomacy.css",
+    "~/assets/css/map-first.css",
+  ],
   typescript: { strict: true },
   runtimeConfig: { gdeltEnabled: true },
   app: {
