@@ -1,0 +1,261 @@
+.map-first-shell .topbar {
+  height: 68px;
+}
+.map-first-shell .main-content {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px 0;
+}
+.map-first-shell .page-heading {
+  order: 0;
+  margin-bottom: 12px;
+}
+.map-first-shell .page-heading h1 {
+  font-size: 25px;
+  margin: 6px 0;
+}
+.map-first-shell .page-heading p {
+  font-size: 11px;
+}
+.map-first-shell .relation-strip {
+  order: 1;
+  padding-bottom: 12px;
+}
+.map-first-shell .diplomacy-monitor {
+  order: 2;
+}
+.map-first-shell .stats-grid {
+  order: 3;
+  margin: 16px 0 0;
+}
+.map-first-shell .page-footer {
+  order: 4;
+}
+.map-first-shell .diplomacy-layout {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  height: clamp(460px, calc(100dvh - 320px), 900px);
+}
+.map-first-shell .diplomacy-layout:not(.map-focused) {
+  grid-template-columns: minmax(0, 1fr) 420px;
+}
+.map-first-shell .diplomacy-layout > .map-section {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+.map-first-shell .timeline-column {
+  grid-column: 2;
+  grid-row: 1;
+  border-left: 1px solid #35434a;
+  border-right: 0;
+}
+.map-first-shell .chronology-track {
+  padding-left: 20px;
+  padding-right: 12px;
+}
+.map-first-shell .chronology-card {
+  padding: 12px;
+}
+.map-first-shell .time-explorer {
+  border-top: 1px solid #35434a;
+}
+.map-first-shell .map-topline {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.map-first-shell .map-topline > button:last-child {
+  margin-left: auto;
+}
+.map-reading-note {
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  color: #a7bac3;
+  font-size: 8px;
+  letter-spacing: 0.25px;
+  text-shadow: 0 1px 6px #000;
+  background: #142129e8;
+  border: 1px solid #33464f;
+  border-radius: 4px;
+  padding: 6px 8px;
+  max-width: 65%;
+  line-height: 1.6;
+  pointer-events: none;
+}
+.map-first-shell .map-coordinate {
+  bottom: 103px;
+}
+.map-first-shell .map-legend {
+  bottom: 20px;
+  font-size: 10px;
+  padding: 11px 14px;
+  gap: 16px;
+}
+.map-first-shell .map-legend i {
+  width: 8px;
+  height: 8px;
+}
+.map-first-shell .map-legend i.armed {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+.map-first-shell .map-legend i.violence {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  width: 10px;
+  height: 10px;
+}
+.map-first-shell .map-legend i.tension {
+  border-radius: 0;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+.map-first-shell .map-legend i.diplomacy {
+  border-radius: 3px;
+}
+.map-first-shell .map-controls {
+  top: 30%;
+}
+.map-first-shell .map-controls button {
+  width: 32px;
+  height: 34px;
+}
+.map-inspection .maplibregl-popup-content {
+  background: #18272f;
+  color: #dce9ec;
+  border: 1px solid #536c77;
+  box-shadow: 0 6px 20px #0006;
+  border-radius: 8px;
+  padding: 13px;
+  min-width: 185px;
+}
+.map-inspection.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: #536c77;
+}
+.map-hover-content strong {
+  display: block;
+  font-family: Manrope, sans-serif;
+  font-size: 12px;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+.map-hover-content p {
+  font-size: 10px;
+  line-height: 1.9;
+  color: #b5c9d2;
+}
+.map-hover-content small {
+  display: block;
+  color: #94aaa4;
+  font-size: 9px;
+  margin-top: 8px;
+}
+@media (min-width: 1700px) {
+  .map-first-shell .diplomacy-layout {
+    grid-template-columns: minmax(0, 1fr) 370px;
+  }
+  .map-first-shell .diplomacy-layout:not(.map-focused) {
+    grid-template-columns: minmax(0, 1fr) 480px;
+  }
+}
+@media (max-width: 1000px) {
+  .map-first-shell .diplomacy-layout {
+    grid-template-columns: minmax(0, 1fr) 285px;
+  }
+  .map-first-shell .diplomacy-layout:not(.map-focused) {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+  .map-first-shell .map-topline > span {
+    font-size: 8px;
+  }
+  .map-first-shell .map-topline > button {
+    font-size: 9px;
+  }
+  .map-first-shell .map-legend {
+    font-size: 8px;
+    gap: 9px;
+    padding: 9px;
+  }
+  .map-reading-note {
+    font-size: 7px;
+    right: 12px;
+    bottom: 62px;
+    max-width: 75%;
+  }
+  .map-first-shell .map-coordinate {
+    bottom: 103px;
+    font-size: 7px;
+  }
+}
+@media (max-width: 680px) {
+  .map-first-shell .topbar {
+    height: 60px;
+  }
+  .map-first-shell .main-content {
+    padding: 14px 12px 70px;
+  }
+  .map-first-shell .page-heading h1 {
+    font-size: 23px;
+    margin: 6px 0 0;
+  }
+  .map-first-shell .page-heading {
+    margin-bottom: 13px;
+  }
+  .map-first-shell .diplomacy-layout {
+    height: clamp(460px, 65dvh, 680px);
+  }
+  .map-first-shell .timeline-column {
+    border-left: 0;
+  }
+  .map-first-shell .map-topline {
+    gap: 7px;
+  }
+  .map-first-shell .map-topline > span {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0 0 3px;
+    font-size: 8px;
+    text-shadow: 0 1px 4px #000;
+  }
+  .map-first-shell .map-topline > button {
+    font-size: 9px;
+    padding: 8px;
+  }
+  .map-first-shell .map-controls button {
+    width: 30px;
+    height: 31px;
+  }
+  .map-first-shell .map-legend {
+    left: 12px;
+    right: 12px;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 10px 8px;
+    font-size: 8px;
+    bottom: 25px;
+    max-width: none;
+  }
+  .map-reading-note {
+    bottom: 75px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+    font-size: 7px;
+    text-align: center;
+  }
+  .map-first-shell .map-coordinate {
+    bottom: 113px;
+    left: 14px;
+  }
+  .map-first-shell .diplomacy-layout .event-detail {
+    bottom: 125px;
+    max-height: calc(100% - 205px);
+  }
+  .map-first-shell .time-explorer .time-inputs {
+    display: none;
+  }
+  .map-first-shell .time-explorer.show-time-inputs .time-inputs {
+    display: flex;
+  }
+}

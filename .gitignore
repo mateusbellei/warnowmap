@@ -8,6 +8,13 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.nuxt
+.output
+.data
+.tools
+.env
+coverage
+test-results
 dist
 dist-ssr
 *.local
@@ -22,3 +29,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.vercel
