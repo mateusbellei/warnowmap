@@ -1,0 +1,136 @@
+.economy-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 18px;
+  background: #201f1a;
+  border-top: 1px solid #424032;
+  border-bottom: 1px solid #424032;
+}
+.economy-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #635637;
+  color: #edcb7b;
+  background: #29271f;
+  border-radius: 7px;
+  padding: 9px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.economy-toggle.active {
+  background: #edcb7b;
+  color: #242115;
+  border-color: #edcb7b;
+}
+.economy-toggle span {
+  font-size: 12px;
+  font-weight: 600;
+}
+.economy-toggle small {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  margin-top: 3px;
+}
+.economy-totals {
+  display: flex;
+  gap: 20px;
+}
+.economy-totals strong {
+  color: #edcb7b;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.economy-totals small {
+  display: block;
+  font-size: 9px;
+  color: #bac0b9;
+  font-weight: 400;
+  margin-top: 3px;
+}
+.economy-sectors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.economy-sectors span {
+  font-size: 10px;
+  color: #c6c7be;
+  background: #2c2c25;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+.economy-sectors b {
+  color: #edcb7b;
+  margin-left: 5px;
+}
+.economy-strip > p {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #a9ada4;
+}
+.economy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #edcb7b;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.timeline-economy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 0;
+  color: #c9b887;
+  font-size: 10px;
+}
+.economic-context {
+  border: 1px solid #605438;
+  background: #29271f;
+  padding: 12px;
+  margin: 12px 0;
+  border-radius: 6px;
+}
+.economic-context h3 {
+  font-size: 12px;
+  color: #edcb7b;
+  margin: 8px 0;
+}
+.event-detail .economic-context p {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #d2d0c4;
+}
+.economic-context small {
+  font-size: 9px;
+  line-height: 1.6;
+  color: #b6b5a8;
+}
+.economy-legend b {
+  color: #edcb7b;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .economy-strip {
+    padding: 10px 12px;
+    gap: 12px;
+  }
+  .economy-sectors {
+    gap: 5px;
+  }
+  .economy-sectors span {
+    font-size: 9px;
+  }
+  .economy-totals {
+    gap: 12px;
+  }
+  .map-first-shell .map-legend {
+    flex-wrap: wrap;
+  }
+}

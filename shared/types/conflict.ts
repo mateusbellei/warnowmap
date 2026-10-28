@@ -13,6 +13,7 @@ export interface CountryRef {
   name: string;
 }
 export interface ConflictEvent {
+  economy?: EconomicImpact;
   id: string;
   title: string;
   location: string;
@@ -31,6 +32,12 @@ export interface ConflictEvent {
   mentions: number;
   military: boolean;
   demo: boolean;
+}
+export interface EconomicImpact {
+  sector: "sanctions" | "trade" | "aid" | "logistics";
+  status: "reported" | "potential";
+  label: string;
+  context: string;
 }
 export interface EventFeed {
   events: ConflictEvent[];

@@ -46,6 +46,7 @@ const geojson = () => ({
     properties: {
       id: event.id,
       kind: event.kind,
+      economic: event.economy ? 1 : 0,
     },
   })),
 });
@@ -67,12 +68,15 @@ function addLayers() {
     cluster: true,
     clusterMaxZoom: 9,
     clusterRadius: 38,
-    clusterProperties: Object.fromEntries(
-      ["armed", "violence", "tension", "diplomacy"].map((kind) => [
-        kind,
-        ["+", ["case", ["==", ["get", "kind"], kind], 1, 0]],
-      ]),
-    ),
+    clusterProperties: {
+      ...Object.fromEntries(
+        ["armed", "violence", "tension", "diplomacy"].map((kind) => [
+          kind,
+          ["+", ["case", ["==", ["get", "kind"], kind], 1, 0]],
+        ]),
+      ),
+      economic: ["+", ["get", "economic"]],
+    },
   });
   map.addLayer({
     id: "heat",
@@ -114,6 +118,8 @@ function addLayers() {
         ["to-string", ["get", "tension"]],
         "-",
         ["to-string", ["get", "diplomacy"]],
+        "-",
+        ["to-string", ["get", "economic"]],
       ],
       "icon-size": ["step", ["get", "point_count"], 0.75, 10, 0.9, 50, 1.1],
       "icon-allow-overlap": true,
@@ -178,6 +184,28 @@ function addLayers() {
     },
   });
   map.addSource("selection", { type: "geojson", data: selectionData() });
+  map.addLayer({
+    id: "economy-badges",
+    type: "symbol",
+    source: "events",
+    filter: [
+      "all",
+      ["!", ["has", "point_count"]],
+      ["==", ["get", "economic"], 1],
+    ],
+    layout: {
+      "text-field": "$",
+      "text-font": ["Noto Sans Regular"],
+      "text-size": 15,
+      "text-offset": [1.1, -1.1],
+      "text-allow-overlap": true,
+    },
+    paint: {
+      "text-color": "#edcb7b",
+      "text-halo-color": "#18212b",
+      "text-halo-width": 2,
+    },
+  });
   map.addLayer({
     id: "selection-ring",
     type: "circle",
@@ -308,7 +336,7 @@ watch(
         renderWorldCopies: false,
       });
       map.setMissingStyleImageResolver((id) => {
-        const match = /^cluster-(\d+)-(\d+)-(\d+)-(\d+)$/.exec(id);
+        const match = /^cluster-(\d+)-(\d+)-(\d+)-(\d+)-(\d+)$/.exec(id);
         if (!match || !map || map.hasImage(id)) return;
         const counts = match.slice(1).map(Number);
         if (
@@ -373,6 +401,9 @@ watch(
               line.textContent = `${kindLabels[kind]}: ${feature.properties?.[kind] ?? 0}`;
               content.append(line);
             }
+            const economic = document.createElement("p");
+            economic.textContent = `Economia: ${feature.properties?.economic ?? 0} sinais (anel dourado)`;
+            content.append(economic);
           } else {
             const item = eventIndex.value.get(String(feature.properties?.id));
             heading.textContent =
@@ -382,6 +413,11 @@ watch(
             const line = document.createElement("p");
             line.textContent = item ? kindLabels[item.kind] : "";
             content.append(line);
+            if (item?.economy) {
+              const economic = document.createElement("p");
+              economic.textContent = `$ ${item.economy.label} · ${item.economy.status === "potential" ? "Potencial" : "Medida relatada"}`;
+              content.append(economic);
+            }
           }
           const hint = document.createElement("small");
           hint.textContent =

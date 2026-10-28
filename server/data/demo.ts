@@ -1,5 +1,6 @@
 import type { ConflictEvent } from "../../shared/types/conflict";
 import { actorCountry } from "../utils/countries";
+import { economicImpact } from "../../shared/utils/economy";
 // Cenários de interface; não são notícias, incidentes confirmados ou um retrato atual.
 const points: [string, string, number, number, ConflictEvent["kind"]][] = [
   ["Ucrânia", "Europa", 37.8, 48.5, "armed"],
@@ -58,6 +59,22 @@ const baseEvents: ConflictEvent[] = points.map(
 );
 export const demoEvents: ConflictEvent[] = [
   ...baseEvents,
+  ...["163", "1312", "071", "191", "0331", "085"].map(
+    (code, index): ConflictEvent => ({
+      ...baseEvents[[2, 11, 0, 12, 1, 8][index]!]!,
+      id: `demo-economy-${index}`,
+      title: `Simulação · ${economicImpact(code)!.label}`,
+      actionCode: code,
+      economy: economicImpact(code),
+      kind: ["071", "0331", "085"].includes(code)
+        ? "diplomacy"
+        : code === "191"
+          ? "armed"
+          : "tension",
+      reportedAt: `2024-04-0${index + 1}T14:00:00Z`,
+      eventDate: `2024-04-0${index + 1}`,
+    }),
+  ),
   ...[2, 0, 1, 8, 11, 12].map((point, index): ConflictEvent => ({
     ...baseEvents[point]!,
     id: `demo-diplomacy-${index}`,

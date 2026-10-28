@@ -22,6 +22,7 @@ import {
   ChevronRight,
   History,
   Map as MapIcon,
+  Landmark,
 } from "@lucide/vue";
 import {
   regions,
@@ -31,6 +32,7 @@ import {
   type Region,
 } from "#shared/types/conflict";
 import { filterEvents } from "#shared/utils/events";
+import { economicSectors } from "#shared/utils/economy";
 import { eventsInView, type MapBounds } from "#shared/utils/map";
 import {
   calendarDays,
@@ -70,6 +72,7 @@ const showFilters = ref(false);
 const showAbout = ref(false);
 const mobileMap = ref(true);
 const onlyInView = ref(false);
+const economicOnly = ref(route.query.economy === "true");
 const mapBounds = shallowRef<MapBounds | null>(null);
 const selected = ref<string | null>(null);
 const aboutPanel = ref<HTMLDialogElement>();
@@ -111,6 +114,7 @@ const baseEvents = computed(() =>
     stateOnly: stateOnly.value,
     country: country.value,
     pair: pair.value,
+    economicOnly: economicOnly.value,
   }),
 );
 const inPeriod = computed(() =>
@@ -135,6 +139,23 @@ const events = computed(() =>
 const timelineEvents = computed(() =>
   onlyInView.value ? eventsInView(events.value, mapBounds.value) : events.value,
 );
+const economicEvents = computed(() =>
+  events.value.filter((event) => event.economy),
+);
+const economicSummary = computed(() => ({
+  reported: economicEvents.value.filter(
+    (event) => event.economy?.status === "reported",
+  ).length,
+  potential: economicEvents.value.filter(
+    (event) => event.economy?.status === "potential",
+  ).length,
+  sectors: Object.entries(economicSectors).map(([key, label]) => ({
+    key,
+    label,
+    count: economicEvents.value.filter((event) => event.economy?.sector === key)
+      .length,
+  })),
+}));
 const dailyCounts = computed(
   () =>
     new Map(
@@ -239,6 +260,7 @@ function resetCursor() {
   playing.value = false;
 }
 function clearFilters() {
+  economicOnly.value = false;
   onlyInView.value = false;
   search.value = "";
   region.value = "Todas as regiões";
@@ -303,13 +325,14 @@ watch(showAbout, (value) => {
   if (value) aboutPanel.value?.showModal();
   else aboutPanel.value?.close();
 });
-watch([search, country, pair, demo], () => {
+watch([search, country, pair, demo, economicOnly], () => {
   router.replace({
     query: {
       q: search.value || undefined,
       country: country.value || undefined,
       pair: pair.value || undefined,
       demo: demo.value ? "true" : undefined,
+      economy: economicOnly.value ? "true" : undefined,
     },
   });
 });
@@ -544,6 +567,46 @@ onBeforeUnmount(() => {
                 : "Recorte ampliado: inclui relações domésticas e atores sem país identificado."
             }}</span>
           </div>
+          <section
+            class="economy-strip"
+            aria-label="Principais sinais econômicos no recorte"
+          >
+            <button
+              class="economy-toggle"
+              :class="{ active: economicOnly }"
+              :aria-pressed="economicOnly"
+              @click="economicOnly = !economicOnly"
+            >
+              <Landmark :size="17" /><span
+                >Economia<small>{{
+                  economicOnly
+                    ? "Ver todos os relatos"
+                    : "Filtrar sinais econômicos"
+                }}</small></span
+              ><Check v-if="economicOnly" :size="14" />
+            </button>
+            <div class="economy-totals">
+              <strong
+                >{{ economicSummary.reported
+                }}<small>medidas relatadas</small></strong
+              ><strong
+                >{{ economicSummary.potential
+                }}<small>ameaças / intenções</small></strong
+              >
+            </div>
+            <div class="economy-sectors">
+              <span v-for="sector in economicSummary.sectors" :key="sector.key"
+                >{{ sector.label }} <b>{{ sector.count }}</b></span
+              >
+            </div>
+            <p>
+              {{
+                economicEvents.length
+                  ? "Sinais do recorte · efeitos possíveis, sem estimativas de perdas ou preços."
+                  : "Sem sinais econômicos classificados neste recorte; não significa ausência de impacto."
+              }}
+            </p>
+          </section>
           <div v-if="showFilters" class="filter-panel">
             <label
               >Região<select v-model="region">
@@ -671,13 +734,14 @@ onBeforeUnmount(() => {
                 <span>•</span> WGS 84
               </div>
               <div class="map-reading-note">
-                Anéis: composição por categoria · número: total de relatos
+                Anéis: categorias · número: relatos · contorno dourado: economia
               </div>
               <div class="map-legend">
                 <span><i class="armed" />Confronto</span
                 ><span><i class="diplomacy" />Diplomacia</span
                 ><span><i class="tension" />Tensão</span
-                ><span><i class="violence" />Violência</span>
+                ><span><i class="violence" />Violência</span
+                ><span class="economy-legend"><b>$</b>Economia</span>
               </div>
               <section
                 v-if="active"
@@ -702,6 +766,34 @@ onBeforeUnmount(() => {
                   ><span>{{ active.countries[1]?.name }}</span>
                 </div>
                 <h2>{{ active.title }}</h2>
+                <section
+                  v-if="active.economy"
+                  class="economic-context"
+                  aria-label="Contexto econômico"
+                >
+                  <span class="economy-badge"
+                    ><Landmark :size="13" />{{
+                      economicSectors[active.economy.sector]
+                    }}
+                    ·
+                    {{
+                      active.economy.status === "reported"
+                        ? "Medida relatada"
+                        : "Potencial"
+                    }}</span
+                  >
+                  <h3>{{ active.economy.label }}</h3>
+                  <p>{{ active.economy.context }}</p>
+                  <small
+                    >{{
+                      active.demo
+                        ? "Cenário ilustrativo."
+                        : "Classificação automática da fonte abaixo."
+                    }}
+                    O vínculo causal com o conflito requer leitura da
+                    fonte.</small
+                  >
+                </section>
                 <p>
                   {{
                     active.actors.length

@@ -16,7 +16,7 @@ export function clusterRing(counts: number[]): ImageData {
   ctx.arc(64, 64, 57, 0, Math.PI * 2);
   ctx.fillStyle = "#15232bf2";
   ctx.fill();
-  const total = counts.reduce((sum, value) => sum + value, 0);
+  const total = counts.slice(0, 4).reduce((sum, value) => sum + value, 0);
   let angle = -Math.PI / 2;
   for (const [index, kind] of (
     ["armed", "violence", "tension", "diplomacy"] as EventKind[]
@@ -30,6 +30,13 @@ export function clusterRing(counts: number[]): ImageData {
       ctx.stroke();
     }
     angle += sweep;
+  }
+  if ((counts[4] ?? 0) > 0) {
+    ctx.beginPath();
+    ctx.arc(64, 64, 62, 0, Math.PI * 2);
+    ctx.strokeStyle = "#edcb7b";
+    ctx.lineWidth = 3;
+    ctx.stroke();
   }
   return ctx.getImageData(0, 0, 128, 128);
 }

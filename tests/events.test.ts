@@ -13,14 +13,18 @@ const defaults = {
 };
 describe("filtros do monitor", () => {
   it("busca sem acentos e combina região e tipo", () => {
+    const results = filterEvents(demoEvents, {
+      ...defaults,
+      search: "ira",
+      region: "Oriente Médio",
+      kinds: ["tension"],
+    });
+    expect(results.length).toBeGreaterThan(0);
     expect(
-      filterEvents(demoEvents, {
-        ...defaults,
-        search: "ira",
-        region: "Oriente Médio",
-        kinds: ["tension"],
-      }).map((e) => e.location),
-    ).toEqual(["Irã"]);
+      results.every(
+        (event) => event.location === "Irã" && event.kind === "tension",
+      ),
+    ).toBe(true);
     expect(filterEvents(demoEvents, { ...defaults, kinds: [] })).toEqual([]);
   });
   it("filtra notícias antigas e datas futuras sem esconder cenários demo", () => {

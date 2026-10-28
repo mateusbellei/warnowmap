@@ -37,6 +37,22 @@ async function handler() {
   ) => Promise<EventFeed>;
 }
 describe("API de relatos", () => {
+  it("enriquece o arquivo anterior com economia mesmo com o provedor indisponível", async () => {
+    stored = {
+      mode: "live",
+      events: [{ ...demoEvents[0]!, actionCode: "163", demo: false }],
+      fetchedAt: "2026-10-28T12:00:00Z",
+      datasetAt: "2026-10-28T12:00:00Z",
+      provider: "GDELT 2.0",
+      message: "",
+    };
+    fetchMock.mockRejectedValue(new Error("offline"));
+    const response = await (await handler())({});
+    expect(response.events[0]?.economy).toMatchObject({
+      sector: "sanctions",
+      status: "reported",
+    });
+  });
   it("expõe indisponibilidade sem inventar relatos", async () => {
     fetchMock.mockRejectedValue(new Error("offline"));
     const response = await (await handler())({});

@@ -3,13 +3,16 @@ import { demoEvents } from "../data/demo";
 import { decodeExport, getExportUrl, parseGdeltExport } from "../utils/gdelt";
 import { mergeHistory } from "../../shared/utils/timeline";
 import { actorCountry } from "../utils/countries";
+import { economicImpact } from "../../shared/utils/economy";
 
 function normalizeCountryNames(feed: EventFeed | null) {
   if (feed)
-    for (const event of feed.events)
+    for (const event of feed.events) {
+      event.economy = economicImpact(event.actionCode);
       event.countries = event.countries.map(
         (country) => actorCountry(country.code) ?? country,
       );
+    }
   return feed;
 }
 

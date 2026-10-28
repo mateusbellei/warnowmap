@@ -13,6 +13,7 @@ export function filterEvents(
     stateOnly?: boolean;
     country?: string;
     pair?: string;
+    economicOnly?: boolean;
   },
 ) {
   const search = filters.search
@@ -24,6 +25,7 @@ export function filterEvents(
     const text = [
       event.title,
       event.location,
+      event.economy?.label ?? "",
       ...event.actors,
       ...event.countries.map((country) => country.name),
     ]
@@ -34,6 +36,7 @@ export function filterEvents(
     const age = filters.now - Date.parse(event.reportedAt);
     return (
       (!filters.militaryOnly || event.military) &&
+      (!filters.economicOnly || !!event.economy) &&
       (!filters.interstateOnly || !!event.countryPair) &&
       (!filters.stateOnly || event.stateLinked) &&
       (!filters.country ||

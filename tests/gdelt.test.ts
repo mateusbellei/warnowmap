@@ -30,6 +30,18 @@ function row(overrides: Record<number, string> = {}) {
   return fields.join("\t");
 }
 describe("normalização do GDELT", () => {
+  it("atribui economia apenas com códigos específicos preservando a categoria original", () => {
+    expect(parseGdeltExport(row({ 26: "163", 28: "16" }))[0]).toMatchObject({
+      kind: "tension",
+      economy: { sector: "sanctions", status: "reported" },
+    });
+    expect(
+      parseGdeltExport(row({ 26: "1312", 28: "13" }))[0]?.economy?.status,
+    ).toBe("potential");
+    expect(
+      parseGdeltExport(row({ 26: "195", 28: "19" }))[0]?.economy,
+    ).toBeUndefined();
+  });
   it("preserva local do evento, atores, fonte e datas distintas", () => {
     const [event] = parseGdeltExport(row({ 1: "20261027" }));
     expect(event).toMatchObject({

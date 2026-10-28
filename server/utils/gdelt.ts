@@ -1,5 +1,6 @@
 import { strFromU8, unzipSync } from "fflate";
 import { actorCountry } from "./countries";
+import { economicImpact } from "../../shared/utils/economy";
 import type { ConflictEvent } from "../../shared/types/conflict";
 import {
   regionFromCoordinates,
@@ -104,6 +105,7 @@ export function parseGdeltExport(text: string): ConflictEvent[] {
       countryPair,
       stateLinked,
       actionCode: row[26]?.trim() || root,
+      economy: economicImpact(row[26]?.trim() || root),
       reportedAt,
       eventDate: `${row[1]!.slice(0, 4)}-${row[1]!.slice(4, 6)}-${row[1]!.slice(6, 8)}`,
       source: new URL(url).hostname.replace(/^www\./, ""),

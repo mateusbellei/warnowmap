@@ -2,6 +2,8 @@
 
 Monitor global de **confrontos e diplomacia entre países**, com Nuxt 4, TypeScript, Nitro e MapLibre GL JS. O mapa é a visualização principal, com símbolos por categoria, agrupamentos proporcionais e linha do tempo sincronizada. Interface em português.
 
+A camada **Economia** resume sanções, comércio, ajuda econômica e rotas/logística. Um filtro destaca os relatos relacionados no mapa e na cronologia, separando medidas relatadas de ameaças ou intenções. Não estima perdas nem preços. Veja o escopo e a metodologia em [ECONOMIA.md](ECONOMIA.md).
+
 ## Executar
 
 Use **Node 24.15+**, ou uma versão compatível declarada em `package.json`. O Node global 22.18 desta máquina é anterior ao mínimo do Nuxt atual. Com nvm: `nvm install 24.15.0` e `nvm use 24.15.0`.
@@ -73,4 +75,4 @@ Não há segredos necessários. Endpoints externos são fixos, as fontes permite
 
 Na auditoria da migração foram corrigidas as ocorrências de severidade alta. Restam sete de severidade baixa na cadeia Nuxt/Nitro/Rollup ligada a `deepmerge` 4.3.1, última versão disponível na consulta. Não foi aplicado o downgrade do Nuxt proposto por `audit --force`. Consulte `npm audit` para acompanhar correções upstream.
 
-O conector GitHub não teve acesso ao remoto `m7bellei/warnowmap` na migração inicial. A evolução de diplomacia e linha do tempo está em `feat/diplomacy-timeline`; o foco visual no mapa está em `feat/map-first-monitor`. São branches locais; não foi publicado PR nem realizado deploy. Consulte `docs/MAPA.md` para a leitura visual e `docs/DIPLOMACIA.md` para o histórico e as relações bilaterais.
+O conector GitHub não teve acesso ao remoto `m7bellei/warnowmap` na migração inicial. A evolução de diplomacia e linha do tempo está em `feat/diplomacy-timeline`; o foco visual no mapa está em `feat/map-first-monitor`; a camada econômica está em `feat/economic-impacts`. São branches locais; não foi publicado PR nem realizado deploy. Consulte `docs/MAPA.md` para a leitura visual, `docs/DIPLOMACIA.md` para o histórico e as relações bilaterais e `ECONOMIA.md` para os sinais econômicos.

@@ -106,6 +106,17 @@ const timeLabel = (date: string) =>
                 ><span>{{ event.countries[1]?.name }}</span>
               </div>
               <h4>{{ event.title }}</h4>
+              <div v-if="event.economy" class="timeline-economy">
+                <span class="economy-badge"
+                  >$
+                  {{
+                    event.economy.status === "reported"
+                      ? "Medida relatada"
+                      : "Potencial"
+                  }}</span
+                >
+                <span>{{ event.economy.label }}</span>
+              </div>
               <p>{{ event.location }}</p>
               <div class="event-footer">
                 <span><span class="source-dot" />{{ event.source }}</span
