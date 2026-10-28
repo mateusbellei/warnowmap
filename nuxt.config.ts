@@ -1,18 +1,18 @@
 export default defineNuxtConfig({
   compatibilityDate: "2026-10-28",
   devtools: { enabled: false },
-  css: ["~/assets/css/main.css"],
+  css: ["~/assets/css/main.css", "~/assets/css/diplomacy.css"],
   typescript: { strict: true },
   runtimeConfig: { gdeltEnabled: true },
   app: {
     head: {
       htmlAttrs: { lang: "pt-BR" },
-      title: "WarNow — Monitor global de conflitos",
+      title: "WarNow — Confrontos e diplomacia",
       meta: [
         {
           name: "description",
           content:
-            "Explore relatos geolocalizados de conflitos em um mapa global. Fontes, contexto e transparência em uma só visão.",
+            "Acompanhe confrontos e diplomacia entre países em uma linha do tempo sincronizada com o mapa global, com fontes e contexto.",
         },
         { name: "theme-color", content: "#101416" },
       ],

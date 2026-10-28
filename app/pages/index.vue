@@ -5,25 +5,23 @@ import {
   Search,
   SlidersHorizontal,
   ArrowUpRight,
-  ChevronDown,
   Crosshair,
   ShieldCheck,
   X,
   RefreshCw,
   ExternalLink,
-  Radar,
-  Map,
   Info,
   Clock3,
   ArrowRight,
   Pause,
   Play,
-  Activity,
-  PanelRightClose,
-  PanelRightOpen,
   Check,
-  Menu,
   Layers,
+  Handshake,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  Map as MapIcon,
 } from "@lucide/vue";
 import {
   regions,
@@ -33,6 +31,11 @@ import {
   type Region,
 } from "#shared/types/conflict";
 import { filterEvents } from "#shared/utils/events";
+import {
+  calendarDays,
+  sortTimeline,
+  timelineDays,
+} from "#shared/utils/timeline";
 
 const route = useRoute();
 const router = useRouter();
@@ -40,117 +43,222 @@ const demo = ref(route.query.demo === "true");
 const search = ref(
   typeof route.query.q === "string" ? route.query.q.slice(0, 200) : "",
 );
-const region = ref<Region>(
-  regions.includes(route.query.region as Region)
-    ? (route.query.region as Region)
-    : "Todas as regiões",
+const region = ref<Region>("Todas as regiões");
+const country = ref(
+  typeof route.query.country === "string" ? route.query.country : "",
 );
-const kinds = ref<EventKind[]>(["armed", "violence", "tension"]);
-const hours = ref(24);
-const militaryOnly = ref(true);
-const visibleCount = ref(60);
-const heatmap = ref(false);
+const pair = ref(typeof route.query.pair === "string" ? route.query.pair : "");
+const interstateOnly = ref(true);
+const stateOnly = ref(true);
+const kinds = ref<EventKind[]>(["armed", "violence", "tension", "diplomacy"]);
+const basis = ref<"event" | "collected">("event");
+const order = ref<"asc" | "desc">("desc");
+const now = ref(Date.now());
+const today = () => new Date().toISOString().slice(0, 10);
+const weekStart = (end: string) =>
+  new Date(Date.parse(`${end}T12:00:00Z`) - 6 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+const from = ref(weekStart(today()));
+const to = ref(today());
+const cursor = ref(6);
+const playing = ref(false);
 const paused = ref(false);
+const heatmap = ref(false);
 const showFilters = ref(false);
 const showAbout = ref(false);
-const sidebar = ref(true);
-const mobileFeed = ref(false);
+const mobileMap = ref(false);
 const selected = ref<string | null>(null);
-const aboutPanel = ref<HTMLElement>();
-let previousFocus: HTMLElement | null = null;
-const now = ref(Date.now());
+const aboutPanel = ref<HTMLDialogElement>();
 const {
   data: feed,
   status,
   error,
   refresh,
 } = await useFetch<EventFeed>("/api/events", {
-  query: { demo },
+  query: {
+    demo,
+    scope: computed(() =>
+      interstateOnly.value ? (stateOnly.value ? "state" : "bilateral") : "all",
+    ),
+  },
   timeout: 65000,
   lazy: true,
+  server: false,
 });
-const events = computed(() =>
+const loading = computed(
+  () =>
+    status.value === "pending" ||
+    (status.value === "idle" && !feed.value && !error.value),
+);
+const isDemo = computed(() => feed.value?.mode === "demo");
+const days = computed(() => calendarDays(from.value, to.value));
+const cutoff = computed(
+  () => days.value[Math.min(cursor.value, days.value.length - 1)] ?? "",
+);
+const atPresent = computed(() => cursor.value === days.value.length - 1);
+const baseEvents = computed(() =>
   filterEvents(feed.value?.events ?? [], {
     search: search.value,
     region: region.value,
     kinds: kinds.value,
-    hours: hours.value,
+    hours: 168,
     now: now.value,
-    militaryOnly: militaryOnly.value,
+    interstateOnly: interstateOnly.value,
+    stateOnly: stateOnly.value,
+    country: country.value,
+    pair: pair.value,
   }),
 );
+const inPeriod = computed(() =>
+  baseEvents.value.filter((event) => {
+    const date =
+      basis.value === "event" ? event.eventDate : event.reportedAt.slice(0, 10);
+    return days.value.length > 0 && date >= from.value && date <= to.value;
+  }),
+);
+const events = computed(() =>
+  sortTimeline(
+    inPeriod.value.filter(
+      (event) =>
+        (basis.value === "event"
+          ? event.eventDate
+          : event.reportedAt.slice(0, 10)) <= cutoff.value,
+    ),
+    basis.value,
+    order.value,
+  ),
+);
+const dailyCounts = computed(
+  () =>
+    new Map(
+      timelineDays(inPeriod.value, basis.value).map((day) => [
+        day.date,
+        day.count,
+      ]),
+    ),
+);
+const maxCount = computed(() => Math.max(1, ...dailyCounts.value.values()));
 const active = computed(() =>
   events.value.find((event) => event.id === selected.value),
 );
-const listEvents = computed(() => events.value.slice(0, visibleCount.value));
-watch([search, region, kinds, hours, militaryOnly], () => {
-  visibleCount.value = 60;
+const countryOptions = computed(() =>
+  [
+    ...new Map(
+      (feed.value?.events ?? [])
+        .flatMap((event) => event.countries)
+        .map((item) => [item.code, item]),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+);
+const relations = computed(() => {
+  const index = new Map<
+    string,
+    { key: string; label: string; count: number }
+  >();
+  for (const event of feed.value?.events ?? []) {
+    if (!event.countryPair || !event.countries[1]) continue;
+    const current = index.get(event.countryPair);
+    if (current) current.count++;
+    else
+      index.set(event.countryPair, {
+        key: event.countryPair,
+        label: [...event.countries]
+          .sort((a, b) => a.code.localeCompare(b.code))
+          .map((c) => c.name)
+          .join(" ↔ "),
+        count: 1,
+      });
+  }
+  return [...index.values()].sort(
+    (a, b) => b.count - a.count || a.key.localeCompare(b.key),
+  );
 });
+const pairOptions = computed(() => relations.value.slice(0, 6));
+const pairLabel = computed(
+  () => relations.value.find((relation) => relation.key === pair.value)?.label,
+);
 const counts = computed(() => ({
-  armed: events.value.filter((e) => e.kind === "armed").length,
-  violence: events.value.filter((e) => e.kind === "violence").length,
+  armed: events.value.filter((e) => ["armed", "violence"].includes(e.kind))
+    .length,
+  diplomacy: events.value.filter((e) => e.kind === "diplomacy").length,
   tension: events.value.filter((e) => e.kind === "tension").length,
+  pairs: new Set(events.value.map((e) => e.countryPair).filter(Boolean)).size,
 }));
-const sourceCount = computed(
-  () => new Set(events.value.filter((e) => !e.demo).map((e) => e.source)).size,
+const modeLabel = computed(() =>
+  !feed.value
+    ? "Aguardando coleta"
+    : {
+        live: "Feed conectado",
+        stale: "Dados desatualizados",
+        demo: "Demonstração",
+        unavailable: "Feed indisponível",
+      }[feed.value?.mode ?? "unavailable"],
 );
-const regionCount = computed(
-  () => new Set(events.value.map((e) => e.region)).size,
-);
-const modeLabel = computed(
-  () =>
-    ({
-      live: "Feed conectado",
-      stale: "Dados desatualizados",
-      demo: "Demonstração",
-      unavailable: "Feed indisponível",
-    })[feed.value?.mode ?? "unavailable"],
-);
-const isDemo = computed(() => feed.value?.mode === "demo");
-const lastUpdate = computed(() =>
-  feed.value?.datasetAt
-    ? formatDate(feed.value.datasetAt)
-    : "Sem coleta ao vivo",
-);
-function formatDate(date: string) {
+function formatDate(value: string, time = false) {
   return (
     new Intl.DateTimeFormat("pt-BR", {
       timeZone: "UTC",
       day: "2-digit",
       month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(date)) + " UTC"
+      year: "numeric",
+      ...(time ? ({ hour: "2-digit", minute: "2-digit" } as const) : {}),
+    }).format(new Date(value.length === 10 ? `${value}T12:00:00Z` : value)) +
+    (time ? " UTC" : "")
   );
 }
-function eventTime(date: string) {
+function shortDay(value: string) {
   return new Intl.DateTimeFormat("pt-BR", {
     timeZone: "UTC",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(`${value}T12:00:00Z`));
 }
 function toggleKind(kind: EventKind) {
   kinds.value = kinds.value.includes(kind)
-    ? kinds.value.filter((k) => k !== kind)
+    ? kinds.value.filter((value) => value !== kind)
     : [...kinds.value, kind];
+}
+function choose(id: string) {
+  selected.value = selected.value === id ? null : id;
+  if (selected.value) mobileMap.value = true;
+}
+function setPair(key: string) {
+  pair.value = pair.value === key ? "" : key;
+  country.value = "";
+  playing.value = false;
+}
+function resetCursor() {
+  cursor.value = Math.max(0, days.value.length - 1);
+  playing.value = false;
 }
 function clearFilters() {
   search.value = "";
   region.value = "Todas as regiões";
-  kinds.value = ["armed", "violence", "tension"];
-  hours.value = 24;
-  militaryOnly.value = true;
+  country.value = "";
+  pair.value = "";
+  interstateOnly.value = true;
+  stateOnly.value = true;
+  kinds.value = ["armed", "violence", "tension", "diplomacy"];
+  basis.value = "event";
+  order.value = "desc";
+  const end = isDemo.value ? "2024-04-06" : today();
+  from.value = weekStart(end);
+  to.value = end;
+  resetCursor();
 }
-function choose(id: string) {
-  selected.value = selected.value === id ? null : id;
-  mobileFeed.value = false;
+function toggleReplay() {
+  if (!days.value.length) return;
+  if (playing.value) playing.value = false;
+  else {
+    if (atPresent.value) cursor.value = 0;
+    playing.value = true;
+  }
 }
-function closeOverlays(event: KeyboardEvent) {
+function keyboard(event: KeyboardEvent) {
   if (event.key === "Escape") {
-    showAbout.value = false;
-    showFilters.value = false;
     selected.value = null;
+    showFilters.value = false;
   }
   if (
     event.key === "/" &&
@@ -163,96 +271,93 @@ function closeOverlays(event: KeyboardEvent) {
     event.preventDefault();
     document.querySelector<HTMLInputElement>(".search-field input")?.focus();
   }
-  if (event.key === "Tab" && showAbout.value) {
-    const controls =
-      aboutPanel.value?.querySelectorAll<HTMLElement>("button,a[href]");
-    if (!controls?.length) return;
-    const first = controls[0]!;
-    const last = controls[controls.length - 1]!;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
 }
-watch(showAbout, async (open) => {
-  if (open) {
-    previousFocus = document.activeElement as HTMLElement;
-    await nextTick();
-    aboutPanel.value?.querySelector<HTMLButtonElement>("button")?.focus();
-  } else previousFocus?.focus();
-});
-watch(events, (value) => {
-  if (selected.value && !value.some((event) => event.id === selected.value))
+watch([from, to, basis], resetCursor);
+watch(events, (values) => {
+  if (selected.value && !values.some((event) => event.id === selected.value))
     selected.value = null;
 });
-watch([search, region, demo], () => {
+watch(
+  isDemo,
+  (value, previous) => {
+    if (previous !== undefined) {
+      country.value = "";
+      pair.value = "";
+      search.value = "";
+    }
+    const end = value ? "2024-04-06" : today();
+    to.value = end;
+    from.value = weekStart(end);
+    resetCursor();
+  },
+  { immediate: true },
+);
+watch(showAbout, (value) => {
+  if (value) aboutPanel.value?.showModal();
+  else aboutPanel.value?.close();
+});
+watch([search, country, pair, demo], () => {
   router.replace({
     query: {
-      ...route.query,
       q: search.value || undefined,
-      region: region.value === "Todas as regiões" ? undefined : region.value,
+      country: country.value || undefined,
+      pair: pair.value || undefined,
       demo: demo.value ? "true" : undefined,
     },
   });
 });
-let timer: ReturnType<typeof setInterval>;
+let poller: ReturnType<typeof setInterval>;
+let replay: ReturnType<typeof setInterval>;
 onMounted(() => {
-  timer = setInterval(() => {
+  document.addEventListener("keydown", keyboard);
+  poller = setInterval(() => {
     now.value = Date.now();
     if (
       !paused.value &&
+      !playing.value &&
       !isDemo.value &&
       !document.hidden &&
       status.value !== "pending"
     )
       refresh();
   }, 60000);
-  document.addEventListener("keydown", closeOverlays);
+  replay = setInterval(() => {
+    if (!playing.value || document.hidden) return;
+    if (atPresent.value) playing.value = false;
+    else cursor.value++;
+  }, 1500);
 });
 onBeforeUnmount(() => {
-  clearInterval(timer);
-  document.removeEventListener("keydown", closeOverlays);
+  clearInterval(poller);
+  clearInterval(replay);
+  document.removeEventListener("keydown", keyboard);
 });
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell diplomatic-shell">
     <a href="#main-content" class="skip-link">Pular para o conteúdo</a>
-    <aside
-      :inert="showAbout"
-      class="navigation-rail"
-      aria-label="Navegação principal"
-    >
+    <aside class="navigation-rail" aria-label="Navegação principal">
       <a class="rail-brand" href="/" aria-label="WarNow início"
-        ><img src="/brand.svg" alt="" width="36" height="36"
-      /></a>
-      <button
+        ><img src="/brand.svg" width="36" height="36" alt="" /></a
+      ><button
         class="rail-button current"
-        title="Mapa global"
-        aria-label="Mapa global"
-        @click="mobileFeed = false"
+        aria-label="Ver linha do tempo"
+        title="Linha do tempo"
+        @click="mobileMap = false"
       >
-        <Globe2 :size="21" />
-      </button>
-      <button
+        <History :size="21" /></button
+      ><button
         class="rail-button"
-        title="Relatos"
-        aria-label="Abrir relatos"
-        @click="
-          sidebar = true;
-          mobileFeed = true;
-        "
+        aria-label="Ver mapa"
+        title="Mapa"
+        @click="mobileMap = true"
       >
-        <Radio :size="21" />
-      </button>
-      <button
+        <Globe2 :size="21" /></button
+      ><button
         class="rail-button"
-        title="Filtros"
         aria-label="Abrir filtros"
+        title="Filtros"
         @click="showFilters = !showFilters"
       >
         <SlidersHorizontal :size="20" />
@@ -260,7 +365,6 @@ onBeforeUnmount(() => {
       <div class="rail-bottom">
         <button
           class="rail-button"
-          title="Sobre os dados"
           aria-label="Sobre os dados"
           @click="showAbout = true"
         >
@@ -268,105 +372,116 @@ onBeforeUnmount(() => {
         ><span class="rail-version">W/N</span>
       </div>
     </aside>
-
-    <div :inert="showAbout" class="workspace">
+    <div class="workspace">
       <header class="topbar">
-        <a href="/" class="wordmark"
+        <a class="wordmark" href="/"
           >war<span>now</span><span class="wordmark-dot">●</span
-          ><small>GLOBAL CONFLICT MONITOR</small></a
+          ><small>CONFLICT & DIPLOMACY MONITOR</small></a
         >
         <nav class="header-nav" aria-label="Visualizações">
-          <button class="active" @click="mobileFeed = false">
-            <Map :size="15" /> Mapa global</button
-          ><button @click="showAbout = true">
-            Fontes e metodologia <ArrowUpRight :size="14" />
+          <button :class="{ active: !mobileMap }" @click="mobileMap = false">
+            <History :size="15" /> Linha do tempo</button
+          ><button :class="{ active: mobileMap }" @click="mobileMap = true">
+            <Globe2 :size="15" /> Mapa global
           </button>
         </nav>
         <div class="topbar-right">
           <span class="connection" :class="feed?.mode"
-            ><i />{{
-              status === "pending" ? "Consultando feed" : modeLabel
-            }}</span
-          ><button
-            class="icon-button mobile-menu"
-            aria-label="Alternar relatos"
-            @click="mobileFeed = !mobileFeed"
+            ><i />{{ loading ? "Consultando feed" : modeLabel }}</span
           >
-            <Menu :size="20" />
-          </button>
         </div>
       </header>
-
       <main id="main-content" class="main-content">
         <section class="page-heading">
           <div>
-            <div class="eyebrow"><span /> OBSERVATÓRIO GLOBAL</div>
-            <h1>O mundo, em perspectiva.</h1>
-            <p>Acompanhe relatos de conflitos e tensões em um só mapa.</p>
+            <div class="eyebrow"><span /> CONFRONTOS & DIPLOMACIA</div>
+            <h1>Entenda o que muda entre países.</h1>
+            <p>
+              Acompanhe confrontos, tensões e diálogo, acontecimento por
+              acontecimento.
+            </p>
           </div>
           <div class="heading-meta">
             <span><Clock3 :size="14" /> ÚLTIMO LOTE</span
-            ><strong>{{ lastUpdate }}</strong
+            ><strong>{{
+              feed?.datasetAt
+                ? formatDate(feed.datasetAt, true)
+                : "Sem coleta ao vivo"
+            }}</strong
             ><button @click="showAbout = true">
-              Entenda a cobertura <ArrowUpRight :size="13" />
+              Fontes e cobertura <ArrowUpRight :size="13" />
             </button>
           </div>
         </section>
-
-        <section class="stats-grid" aria-label="Resumo dos relatos filtrados">
+        <section class="stats-grid" aria-label="Resumo do recorte temporal">
           <article>
-            <div class="stat-icon coral"><Crosshair :size="19" /></div>
+            <div class="stat-icon coral"><Crosshair :size="20" /></div>
             <div>
-              <span>{{ isDemo ? "Cenários no mapa" : "Relatos no mapa" }}</span
-              ><strong
-                >{{ events.length.toString().padStart(2, "0")
-                }}<small>{{
-                  isDemo ? "ilustrativos" : "último lote"
-                }}</small></strong
-              >
-            </div>
-            <Activity class="stat-decoration" :size="50" />
-          </article>
-          <article>
-            <div class="stat-icon amber"><Radar :size="20" /></div>
-            <div>
-              <span>Confrontos armados</span
+              <span>Confrontos e violência</span
               ><strong
                 >{{ counts.armed.toString().padStart(2, "0")
-                }}<small>relatos classificados</small></strong
+                }}<small>relatos no recorte</small></strong
+              >
+            </div>
+          </article>
+          <article>
+            <div class="stat-icon green"><Handshake :size="20" /></div>
+            <div>
+              <span>Ações diplomáticas</span
+              ><strong
+                >{{ counts.diplomacy.toString().padStart(2, "0")
+                }}<small>diálogo e cooperação</small></strong
+              >
+            </div>
+          </article>
+          <article>
+            <div class="stat-icon amber"><Radio :size="20" /></div>
+            <div>
+              <span>Tensões e coerção</span
+              ><strong
+                >{{ counts.tension.toString().padStart(2, "0")
+                }}<small>classificação automática</small></strong
               >
             </div>
           </article>
           <article>
             <div class="stat-icon blue"><Globe2 :size="20" /></div>
             <div>
-              <span>Regiões com relatos</span
+              <span>Relações bilaterais</span
               ><strong
-                >{{ regionCount.toString().padStart(2, "0")
-                }}<small>neste recorte</small></strong
-              >
-            </div>
-          </article>
-          <article>
-            <div class="stat-icon green"><Radio :size="20" /></div>
-            <div>
-              <span>Fontes de notícias</span
-              ><strong
-                >{{ sourceCount.toString().padStart(2, "0")
-                }}<small>{{
-                  isDemo ? "modo demonstração" : "domínios distintos"
-                }}</small></strong
+                >{{ counts.pairs.toString().padStart(2, "0")
+                }}<small>pares de países</small></strong
               >
             </div>
           </article>
         </section>
 
-        <section class="monitor" aria-label="Monitor de conflitos">
+        <section
+          class="relation-strip"
+          aria-label="Relações presentes no histórico"
+        >
+          <span>EXPLORAR RELAÇÕES</span
+          ><button :class="{ active: !pair }" @click="pair = ''">Todas</button
+          ><button
+            v-for="relation in pairOptions"
+            :key="relation.key"
+            :class="{ active: pair === relation.key }"
+            @click="setPair(relation.key)"
+          >
+            {{ relation.label }} <small>{{ relation.count }}</small>
+          </button>
+        </section>
+        <section
+          class="monitor diplomacy-monitor"
+          aria-label="Monitor de confrontos e diplomacia"
+        >
           <div class="monitor-toolbar">
             <div class="view-title">
-              <span class="live-dot" /><strong>Visão global</strong
+              <span class="live-dot" /><strong>{{
+                pairLabel || "Confrontos e diplomacia"
+              }}</strong
               ><span class="toolbar-divider" /><span class="muted"
-                >{{ events.length }} {{ isDemo ? "cenários" : "relatos" }}</span
+                >{{ events.length }} relatos</span
               >
             </div>
             <div class="toolbar-actions">
@@ -374,9 +489,9 @@ onBeforeUnmount(() => {
                 ><Search :size="16" /><input
                   v-model="search"
                   type="search"
-                  placeholder="Buscar local ou ator…"
-                  aria-label="Buscar local ou ator"
                   maxlength="200"
+                  aria-label="Buscar país, local ou ator"
+                  placeholder="Buscar país, local ou ator…"
                 /><kbd>/</kbd></label
               ><button
                 class="filter-button"
@@ -384,66 +499,268 @@ onBeforeUnmount(() => {
                 :aria-expanded="showFilters"
                 @click="showFilters = !showFilters"
               >
-                <SlidersHorizontal :size="15" /><span>Filtros</span></button
+                <SlidersHorizontal :size="15" /> Filtros</button
               ><button
-                class="icon-button panel-toggle"
-                :aria-label="sidebar ? 'Ocultar lista' : 'Mostrar lista'"
-                @click="sidebar = !sidebar"
+                class="icon-button"
+                aria-label="Fontes e metodologia"
+                @click="showAbout = true"
               >
-                <PanelRightClose v-if="sidebar" :size="19" /><PanelRightOpen
-                  v-else
-                  :size="19"
-                />
+                <Info :size="17" />
               </button>
             </div>
           </div>
-
+          <div
+            class="diplomacy-categories"
+            aria-label="Categorias de acontecimentos"
+          >
+            <button
+              v-for="(label, kind) in kindLabels"
+              :key="kind"
+              :class="[kind, { active: kinds.includes(kind) }]"
+              :aria-pressed="kinds.includes(kind)"
+              :aria-label="label"
+              @click="toggleKind(kind)"
+            >
+              <i /><Check v-if="kinds.includes(kind)" :size="12" /><span
+                class="category-full"
+                >{{ label }}</span
+              ><span class="category-short">{{
+                kind === "armed"
+                  ? "Confronto"
+                  : kind === "tension"
+                    ? "Tensão"
+                    : label
+              }}</span></button
+            ><span>{{
+              interstateOnly
+                ? "Atores de países distintos; não equivale a guerra declarada."
+                : "Recorte ampliado: inclui relações domésticas e atores sem país identificado."
+            }}</span>
+          </div>
           <div v-if="showFilters" class="filter-panel">
             <label
               >Região<select v-model="region">
                 <option v-for="item in regions" :key="item">{{ item }}</option>
               </select></label
-            >
-            <label
-              >Coleta nas últimas<select v-model.number="hours">
-                <option :value="1">1 hora</option>
-                <option :value="6">6 horas</option>
-                <option :value="24">24 horas</option>
+            ><label
+              >País<select v-model="country" @change="pair = ''">
+                <option value="">Todos os países</option>
+                <option
+                  v-for="item in countryOptions"
+                  :key="item.code"
+                  :value="item.code"
+                >
+                  {{ item.name }}
+                </option>
               </select></label
-            >
-            <div class="kind-filters">
-              <button
-                v-for="(label, kind) in kindLabels"
-                :key="kind"
-                :class="{ toggled: kinds.includes(kind) }"
-                :aria-pressed="kinds.includes(kind)"
-                @click="toggleKind(kind)"
-              >
-                <Check v-if="kinds.includes(kind)" :size="13" />{{ label }}
-              </button>
-            </div>
-            <label class="military-filter"
-              ><input v-model="militaryOnly" type="checkbox" /> Priorizar atores
-              armados
-              <small
-                >Filtro automático MIL / REB / INS / SEP / UAF</small
+            ><label
+              >Relação bilateral<select v-model="pair" @change="country = ''">
+                <option value="">Todas as relações</option>
+                <option
+                  v-for="relation in relations"
+                  :key="relation.key"
+                  :value="relation.key"
+                >
+                  {{ relation.label }}
+                </option>
+              </select></label
+            ><label class="military-filter"
+              ><input v-model="interstateOnly" type="checkbox" /> Apenas países
+              distintos</label
+            ><label class="military-filter"
+              ><input v-model="stateOnly" type="checkbox" /> Com vínculo estatal
+              identificado<small
+                >Governo, forças armadas, elite ou código nacional</small
               ></label
-            >
-            <button class="text-button" @click="clearFilters">
+            ><button class="text-button" @click="clearFilters">
               Limpar filtros
             </button>
           </div>
 
-          <div
-            class="monitor-body"
-            :class="{
-              'without-sidebar': !sidebar,
-              'mobile-feed-open': mobileFeed,
-            }"
+          <section
+            class="time-explorer"
+            :class="{ 'show-time-inputs': showFilters }"
+            aria-label="Explorar a linha do tempo"
           >
+            <div class="time-explorer-top">
+              <div class="time-context">
+                <History :size="16" /><strong>{{
+                  atPresent
+                    ? "Período completo"
+                    : `Até ${cutoff ? shortDay(cutoff) : "—"}`
+                }}</strong
+                ><span>{{
+                  basis === "event"
+                    ? "Data do acontecimento"
+                    : "Data de entrada no feed"
+                }}</span>
+              </div>
+              <div class="time-inputs">
+                <label
+                  >De<input
+                    v-model="from"
+                    type="date"
+                    aria-label="Data inicial" /></label
+                ><label
+                  >Até<input
+                    v-model="to"
+                    type="date"
+                    aria-label="Data final" /></label
+                ><label class="time-basis"
+                  >Ordenar por<select
+                    v-model="basis"
+                    aria-label="Base temporal"
+                  >
+                    <option value="event">Data do fato</option>
+                    <option value="collected">Entrada no feed</option>
+                  </select></label
+                >
+              </div>
+            </div>
+            <div v-if="days.length" class="time-playback">
+              <button
+                class="playback-play"
+                :aria-label="
+                  playing
+                    ? 'Pausar reprodução temporal'
+                    : 'Reproduzir linha do tempo'
+                "
+                :aria-pressed="playing"
+                @click="toggleReplay"
+              >
+                <Pause v-if="playing" :size="18" /><Play v-else :size="18" />
+              </button>
+              <div class="time-axis">
+                <div class="time-bars" aria-hidden="true">
+                  <span
+                    v-for="(day, index) in days"
+                    :key="day"
+                    :class="{
+                      reached: index <= cursor,
+                      current: index === cursor,
+                    }"
+                    :title="`${day}: ${dailyCounts.get(day) ?? 0} relatos`"
+                    ><i
+                      :style="{
+                        height: `${Math.max(4, ((dailyCounts.get(day) ?? 0) / maxCount) * 100)}%`,
+                      }"
+                  /></span>
+                </div>
+                <input
+                  v-model.number="cursor"
+                  type="range"
+                  min="0"
+                  :max="days.length - 1"
+                  step="1"
+                  aria-label="Navegar por dia na linha do tempo"
+                  :aria-valuetext="`Até ${cutoff}`"
+                  @input="playing = false"
+                />
+                <div class="time-axis-labels">
+                  <span>{{ shortDay(from) }}</span
+                  ><span
+                    >{{ cutoff ? shortDay(cutoff) : "" }} ·
+                    {{ events.length }} relatos até esta data</span
+                  ><span>{{ shortDay(to) }}</span>
+                </div>
+              </div>
+              <div class="playback-step">
+                <button
+                  aria-label="Dia anterior"
+                  :disabled="cursor <= 0"
+                  @click="
+                    cursor--;
+                    playing = false;
+                  "
+                >
+                  <ChevronLeft :size="16" /></button
+                ><button
+                  aria-label="Próximo dia"
+                  :disabled="atPresent"
+                  @click="
+                    cursor++;
+                    playing = false;
+                  "
+                >
+                  <ChevronRight :size="16" />
+                </button>
+              </div>
+              <button class="text-button time-reset" @click="resetCursor">
+                Ver período inteiro
+              </button>
+            </div>
+            <p v-else class="time-range-error" role="alert">
+              Selecione um período válido de até 90 dias, com a data inicial
+              anterior à final.
+            </p>
+            <p class="coverage-note">
+              <Info :size="12" /><span v-if="isDemo"
+                >Simulação explícita · datas e acontecimentos ilustrativos de
+                abril de 2024.</span
+              ><span v-else-if="feed?.coverage"
+                >{{ feed.coverage.batches }}
+                {{
+                  feed.coverage.batches === 1
+                    ? "lote acumulado"
+                    : "lotes acumulados"
+                }}
+                desde {{ formatDate(feed.coverage.firstCollectedAt, true) }} ·
+                retenção de até 7 dias / 15 mil relatos. Dias vazios podem
+                refletir lacunas de coleta.</span
+              ><span v-else
+                >Aguardando cobertura da primeira coleta. O histórico não é
+                retroativo.</span
+              >
+            </p>
+          </section>
+
+          <div
+            v-if="error || (feed && feed.mode !== 'live')"
+            class="feed-status-banner"
+            :class="feed?.mode"
+            role="status"
+          >
+            <Info :size="15" /><span>{{
+              error
+                ? "Falha ao consultar o servidor. Tente atualizar o feed."
+                : feed?.message
+            }}</span
+            ><button v-if="!isDemo" class="text-button" @click="demo = true">
+              Explorar demo <ArrowRight :size="13" /></button
+            ><button v-else class="text-button" @click="demo = false">
+              Consultar feed <ArrowRight :size="13" />
+            </button>
+          </div>
+
+          <div
+            class="diplomacy-layout"
+            :class="{ 'mobile-map': mobileMap, 'map-focused': mobileMap }"
+          >
+            <div class="timeline-column">
+              <div class="timeline-sort">
+                <span>{{
+                  interstateOnly
+                    ? "Atores de países distintos"
+                    : "Todos os atores"
+                }}</span
+                ><label
+                  >Ordem<select v-model="order" aria-label="Ordem cronológica">
+                    <option value="desc">Mais recentes</option>
+                    <option value="asc">Mais antigos</option>
+                  </select></label
+                >
+              </div>
+              <EventTimeline
+                :events="events"
+                :selected="selected"
+                :basis="basis"
+                :loading="loading"
+                @select="choose"
+              />
+            </div>
             <div class="map-section">
               <ClientOnly
-                ><ConflictMap
+                ><LazyConflictMap
                   :events="events"
                   :selected="selected"
                   :heatmap="heatmap"
@@ -455,53 +772,28 @@ onBeforeUnmount(() => {
                 ></ClientOnly
               >
               <div class="map-topline">
-                <span
-                  ><Globe2 :size="13" />
-                  {{
-                    region === "Todas as regiões"
-                      ? "MUNDO"
-                      : region.toUpperCase()
-                  }}<ChevronDown :size="12" /></span
+                <span><Globe2 :size="13" />MAPA DO RECORTE</span
                 ><button
                   :class="{ toggled: heatmap }"
                   :aria-pressed="heatmap"
                   @click="heatmap = !heatmap"
                 >
-                  <Layers :size="13" /> Densidade de relatos
-                </button>
-              </div>
-              <div
-                v-if="feed?.mode !== 'live' || error"
-                class="map-status"
-                :class="{ demo: isDemo }"
-              >
-                <Info :size="15" /><span>{{
-                  error
-                    ? "Falha na conexão com o servidor. Tente atualizar."
-                    : feed?.message || "Consultando a fonte de dados…"
-                }}</span
-                ><button
-                  v-if="!isDemo && status !== 'pending'"
-                  @click="demo = true"
-                >
-                  Explorar demo <ArrowRight :size="13" /></button
-                ><button v-if="isDemo" @click="demo = false">
-                  Consultar feed <ArrowRight :size="13" />
+                  <Layers :size="13" /> Densidade
                 </button>
               </div>
               <div class="map-coordinate">
-                GLOBAL VIEW <span>•</span> WGS 84
+                {{ cutoff ? `ATÉ ${cutoff}` : "SEM RECORTE" }}
+                <span>•</span> WGS 84
               </div>
               <div class="map-legend">
-                <span><i class="armed" />Confronto armado</span
-                ><span><i class="violence" />Violência</span
-                ><span><i class="tension" />Coerção / tensão</span
-                ><span class="legend-note">Localizações aproximadas</span>
+                <span><i class="armed" />Confronto</span
+                ><span><i class="diplomacy" />Diplomacia</span
+                ><span><i class="tension" />Tensão</span
+                ><span><i class="violence" />Violência</span>
               </div>
-              <div
+              <section
                 v-if="active"
                 class="event-detail"
-                role="region"
                 aria-label="Detalhes do relato"
               >
                 <div class="detail-top">
@@ -516,29 +808,40 @@ onBeforeUnmount(() => {
                     <X :size="17" />
                   </button>
                 </div>
+                <div v-if="active.countryPair" class="country-relation">
+                  <span>{{ active.countries[0]?.name }}</span
+                  ><span class="relation-link">↔</span
+                  ><span>{{ active.countries[1]?.name }}</span>
+                </div>
                 <h2>{{ active.title }}</h2>
                 <p>
                   {{
                     active.actors.length
                       ? active.actors.join(" · ")
-                      : "Cenário ilustrativo para explorar os recursos do mapa."
+                      : "Acontecimento ilustrativo, sem validade factual."
                   }}
                 </p>
                 <dl>
                   <div>
-                    <dt>Data do evento</dt>
-                    <dd>{{ active.eventDate }}</dd>
+                    <dt>Data do fato</dt>
+                    <dd>{{ formatDate(active.eventDate) }}</dd>
                   </div>
                   <div>
                     <dt>Entrada no feed</dt>
-                    <dd>{{ formatDate(active.reportedAt) }}</dd>
+                    <dd>{{ formatDate(active.reportedAt, true) }}</dd>
                   </div>
                   <div>
-                    <dt>Verificação</dt>
+                    <dt>Local aproximado</dt>
+                    <dd>{{ active.location }}</dd>
+                  </div>
+                  <div>
+                    <dt>Classificação CAMEO</dt>
+                    <dd>{{ active.actionCode }}</dd>
+                  </div>
+                  <div>
+                    <dt>Revisão editorial</dt>
                     <dd>
-                      {{
-                        active.demo ? "Demonstração" : "Sem revisão editorial"
-                      }}
+                      {{ active.demo ? "Demonstração" : "Não realizada" }}
                     </dd>
                   </div>
                 </dl>
@@ -549,265 +852,123 @@ onBeforeUnmount(() => {
                   rel="noopener noreferrer"
                   >Ler fonte original <ExternalLink :size="14" /></a
                 ><small
-                  >A classificação automática e as coordenadas podem conter
-                  erros.</small
+                  >Países indicam afiliação dos atores, não confirmação de ação
+                  estatal. Local aproximado.</small
                 >
-              </div>
+              </section>
             </div>
-
-            <aside
-              v-if="sidebar"
-              class="feed-panel"
-              aria-label="Lista de relatos"
-            >
-              <div class="feed-heading">
-                <div>
-                  <Radio :size="17" />
-                  <h2>
-                    {{ isDemo ? "Cenários ilustrativos" : "Últimos relatos" }}
-                  </h2>
-                </div>
-                <span>{{ events.length }}</span>
-              </div>
-              <div class="feed-subheading">
-                <span>{{
-                  isDemo
-                    ? "Explore o modo demonstração"
-                    : "Ordenados por entrada no feed"
-                }}</span
-                ><button
-                  :disabled="status === 'pending'"
-                  title="Atualizar relatos"
-                  aria-label="Atualizar relatos"
-                  @click="refresh()"
-                >
-                  <RefreshCw
-                    :size="13"
-                    :class="{ spinning: status === 'pending' }"
-                  />
-                </button>
-              </div>
-              <div
-                class="events-list"
-                aria-live="polite"
-                :aria-busy="status === 'pending'"
-              >
-                <div v-if="status === 'pending' && !feed" class="empty-state">
-                  <Radar class="spinning" :size="30" /><strong
-                    >Consultando o mundo</strong
-                  >
-                  <p>Carregando o último lote de relatos.</p>
-                </div>
-                <template v-else-if="events.length"
-                  ><button
-                    v-for="event in listEvents"
-                    :key="event.id"
-                    class="event-card"
-                    :class="{ selected: selected === event.id }"
-                    :aria-pressed="selected === event.id"
-                    @click="choose(event.id)"
-                  >
-                    <div class="event-meta">
-                      <span class="event-category" :class="event.kind"
-                        ><i />{{ kindLabels[event.kind] }}</span
-                      ><time :datetime="event.reportedAt">{{
-                        event.demo ? "DEMO" : eventTime(event.reportedAt)
-                      }}</time>
-                    </div>
-                    <h3>{{ event.title }}</h3>
-                    <p>
-                      {{
-                        event.actors.length
-                          ? event.actors.join(" · ")
-                          : "Exemplo de visualização, sem validade factual."
-                      }}
-                    </p>
-                    <div class="event-footer">
-                      <span><span class="source-dot" />{{ event.source }}</span
-                      ><ArrowUpRight :size="14" />
-                    </div></button
-                ></template>
-                <div v-else class="empty-state">
-                  <Search :size="29" /><strong>{{
-                    feed?.mode === "unavailable" || error
-                      ? "Fonte indisponível"
-                      : "Nenhum relato neste recorte"
-                  }}</strong>
-                  <p>
-                    {{
-                      feed?.mode === "unavailable" || error
-                        ? "Tente uma nova coleta ou conheça a interface no modo demonstração."
-                        : "A ausência de relatos neste lote não significa ausência de conflitos."
-                    }}
-                  </p>
-                  <button
-                    class="filter-button"
-                    @click="
-                      feed?.mode === 'unavailable' || error
-                        ? (demo = true)
-                        : clearFilters()
-                    "
-                  >
-                    {{
-                      feed?.mode === "unavailable" || error
-                        ? "Explorar demonstração"
-                        : "Limpar filtros"
-                    }}
-                  </button>
-                </div>
-                <button
-                  v-if="events.length > visibleCount"
-                  class="load-more filter-button"
-                  @click="visibleCount += 60"
-                >
-                  Mostrar mais relatos ({{ events.length - visibleCount }})
-                </button>
-              </div>
-              <button class="feed-methodology" @click="showAbout = true">
-                <ShieldCheck :size="16" /><span
-                  >Transparência em cada relato<small
-                    >Conheça as fontes e limitações</small
-                  ></span
-                ><ArrowUpRight :size="15" />
-              </button>
-            </aside>
           </div>
-
           <div class="timeline-bar">
             <div>
               <span class="timeline-dot" /><strong>{{
-                isDemo ? "MODO DEMONSTRAÇÃO" : "ÚLTIMO LOTE DISPONÍVEL"
+                isDemo ? "SIMULAÇÃO" : "HISTÓRICO DAS COLETAS"
               }}</strong
-              ><span class="timeline-caption">{{
-                isDemo
-                  ? "Cenários ilustrativos · sem dados ao vivo"
-                  : "GDELT publica lotes a cada 15 minutos"
-              }}</span>
+              ><span class="timeline-caption"
+                >Mapa e relatos acompanham o cursor temporal</span
+              >
             </div>
             <div>
               <button
+                :aria-pressed="paused"
                 :aria-label="
                   paused
                     ? 'Retomar atualização automática'
                     : 'Pausar atualização automática'
                 "
-                :aria-pressed="paused"
                 @click="paused = !paused"
               >
                 <Play v-if="paused" :size="13" /><Pause v-else :size="13" />{{
                   paused ? "Pausado" : "Auto"
                 }}</button
-              ><button :disabled="status === 'pending'" @click="refresh()">
-                <RefreshCw
-                  :size="13"
-                  :class="{ spinning: status === 'pending' }"
-                />Atualizar
+              ><button :disabled="loading" @click="refresh()">
+                <RefreshCw :size="13" :class="{ spinning: loading }" />Atualizar
               </button>
             </div>
           </div>
         </section>
         <footer class="page-footer">
           <span
-            ><ShieldCheck :size="13" /> Informação com contexto. Relatos não
-            equivalem a fatos verificados.</span
+            ><ShieldCheck :size="13" /> Relatos automáticos, com fonte e
+            contexto. Não são fatos confirmados.</span
           ><button @click="showAbout = true">
-            Sobre o WarNow <ArrowUpRight :size="12" />
+            Fontes e metodologia <ArrowUpRight :size="12" />
           </button>
         </footer>
-        <button
-          class="mobile-feed-toggle"
-          @click="
-            mobileFeed = !mobileFeed;
-            sidebar = true;
-          "
-        >
-          <Map v-if="mobileFeed" :size="16" /><Radio v-else :size="16" />{{
-            mobileFeed ? "Ver mapa" : `Ver ${events.length} relatos`
+        <button class="mobile-feed-toggle" @click="mobileMap = !mobileMap">
+          <History v-if="mobileMap" :size="16" /><MapIcon v-else :size="16" />{{
+            mobileMap ? "Ver linha do tempo" : "Ver mapa do período"
           }}
         </button>
       </main>
     </div>
-
-    <div
-      v-if="showAbout"
-      class="modal-backdrop"
-      @click.self="showAbout = false"
+    <dialog
+      ref="aboutPanel"
+      class="about-modal native-methodology"
+      aria-labelledby="about-title"
+      @close="showAbout = false"
     >
-      <section
-        ref="aboutPanel"
-        class="about-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="about-title"
+      <button
+        class="modal-close icon-button"
+        aria-label="Fechar metodologia"
+        @click="showAbout = false"
       >
-        <button
-          class="modal-close icon-button"
-          aria-label="Fechar metodologia"
-          autofocus
-          @click="showAbout = false"
+        <X :size="20" />
+      </button>
+      <div class="eyebrow">FONTES E METODOLOGIA</div>
+      <h2 id="about-title">Confronto e diálogo,<br />com contexto temporal.</h2>
+      <p>
+        O GDELT 2.0 extrai ações e atores de notícias. Exibimos confrontos,
+        coerção e categorias de consultas, cooperação, ajuda e concessões. A
+        classificação diplomática pode incluir propostas e gestos; não confirma
+        um acordo ou cessar-fogo.
+      </p>
+      <h3>Países e relações</h3>
+      <p>
+        Os países vêm de Actor1CountryCode e Actor2CountryCode, não do local da
+        notícia. O recorte bilateral exige dois códigos nacionais distintos
+        reconhecidos. Afiliação nacional não prova envolvimento de governos ou
+        guerra declarada. O filtro de vínculo estatal é uma heurística adicional
+        de cargos e códigos dos atores.
+      </p>
+      <h3>Como ler a linha do tempo</h3>
+      <p>
+        A data atribuída ao fato tem precisão de um dia; não inventamos
+        horários. A entrada no feed tem horário UTC e pode ocorrer muito depois.
+        Troque a base temporal para investigar essa diferença. O cursor mostra
+        os relatos entre o início do período e o dia selecionado; a reprodução
+        avança por dia e não mostra movimentos militares.
+      </p>
+      <h3>Cobertura e limitações</h3>
+      <p>
+        Guardamos os lotes coletados sob demanda por até sete dias, limitados a
+        15 mil registros. Sem visitantes não há ingestão contínua nem garantia
+        de preencher intervalos perdidos. O histórico começa na primeira coleta
+        e não é completo ou retroativo. Datas vazias não provam ausência de
+        acontecimentos.
+      </p>
+      <p>
+        Fontes, coordenadas e categorias podem conter erros. Agrupamos o mesmo
+        artigo, local, data, categoria, ação e par de países. Não deduplicamos
+        fatos entre veículos. O modo demonstração contém apenas cenários
+        ilustrativos.
+      </p>
+      <div class="about-links">
+        <a
+          href="https://data.gdeltproject.org/documentation/GDELT-Event_Codebook-V2.0.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Dicionário GDELT <ExternalLink :size="14" /></a
+        ><button
+          class="filter-button"
+          @click="
+            demo = !demo;
+            showAbout = false;
+          "
         >
-          <X :size="20" />
+          {{ isDemo ? "Consultar feed real" : "Explorar demonstração"
+          }}<ArrowRight :size="14" />
         </button>
-        <div class="eyebrow">FONTES E METODOLOGIA</div>
-        <h2 id="about-title">
-          Um mapa para investigar.<br />Uma fonte para cada relato.
-        </h2>
-        <p>
-          O WarNow mostra eventos classificados automaticamente pelo
-          <a
-            href="https://www.gdeltproject.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-            >GDELT 2.0</a
-          >, extraídos de notícias públicas. Cada ponto leva à publicação
-          original.
-        </p>
-        <h3>Como o feed funciona</h3>
-        <p>
-          Consultamos o último arquivo global de eventos a cada minuto, com
-          cache de cinco minutos no servidor. O GDELT publica um lote a cada 15
-          minutos. Por padrão, priorizamos atores armados identificados pelo
-          GDELT (MIL, REB, INS, SEP e UAF) e relatos de violência em massa. Você
-          pode ampliar o recorte nos filtros. Agrupamos extrações do mesmo
-          artigo, local, tipo e data. Exibimos códigos CAMEO 17 a 20: coerção,
-          violência, confronto e violência em massa. Não são alertas
-          instantâneos, contagem de guerras ou cobertura completa das últimas 24
-          horas.
-        </p>
-        <h3>O que o mapa pode afirmar</h3>
-        <p>
-          As coordenadas são os locais citados nas notícias, com precisão
-          variável. A classificação, os atores e a data do evento podem estar
-          incorretos. As regiões são agrupamentos geográficos aproximados.
-          Relatos podem se referir ao mesmo fato; o número de pontos não mede
-          intensidade ou vítimas. Não desenhamos territórios controlados sem uma
-          fonte validada.
-        </p>
-        <h3>Atualidade e demonstração</h3>
-        <p>
-          Um lote com mais de uma hora é sinalizado como desatualizado. Em
-          falhas, mostramos a última coleta com aviso. O modo demonstração usa
-          apenas cenários ilustrativos datados de 2024, sem representar notícias
-          ou a situação atual.
-        </p>
-        <div class="about-links">
-          <a
-            href="https://data.gdeltproject.org/documentation/GDELT-Event_Codebook-V2.0.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            >Dicionário GDELT <ExternalLink :size="14" /></a
-          ><button
-            class="filter-button"
-            @click="
-              demo = !demo;
-              showAbout = false;
-            "
-          >
-            {{ isDemo ? "Consultar feed real" : "Explorar demonstração"
-            }}<ArrowRight :size="14" />
-          </button>
-        </div>
-      </section>
-    </div>
+      </div>
+    </dialog>
   </div>
 </template>
