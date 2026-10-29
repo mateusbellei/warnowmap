@@ -1,9 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { economicImpact } from "../shared/utils/economy";
+import {
+  economicImpact,
+  headlineEconomicSignal,
+} from "../shared/utils/economy";
 import { filterEvents } from "../shared/utils/events";
 import { demoEvents } from "../server/data/demo";
 
 describe("sinais econômicos", () => {
+  it("distingue medida, interrupção, efeito descrito e risco sem inventar preços ou causalidade", () => {
+    expect(
+      headlineEconomicSignal("Iran sanctions announced", ["SANCTIONS"])?.stage,
+    ).toBe("measure");
+    expect(
+      headlineEconomicSignal("War disrupts shipping through Hormuz", [
+        "ARMEDCONFLICT",
+      ])?.stage,
+    ).toBe("disruption");
+    expect(
+      headlineEconomicSignal("Oil prices surge amid Iran war", [
+        "ARMEDCONFLICT",
+      ])?.stage,
+    ).toBe("effect");
+    expect(
+      headlineEconomicSignal("War could disrupt Hormuz shipping", [
+        "ARMEDCONFLICT",
+      ])?.stage,
+    ).toBe("risk");
+    expect(
+      headlineEconomicSignal("Oil prices surge on earnings news", [
+        "ARMEDCONFLICT",
+      ]),
+    ).toBeUndefined();
+    expect(
+      headlineEconomicSignal("War disrupts Hormuz shipping", []),
+    ).toBeUndefined();
+  });
   it("separa sanção relatada de ameaça e ajuda de intenção", () => {
     expect(economicImpact("163")).toMatchObject({
       sector: "sanctions",
