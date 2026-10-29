@@ -154,6 +154,7 @@ describe("API de relatos", () => {
     const api = await handler();
     const partial = await api({});
     expect(partial.mode).toBe("stale");
+    expect(partial.operation?.lastSuccessAt).toBeNull();
     expect(partial.events).toHaveLength(1);
     expect(partial.events[0]?.reportCount).toBe(7);
     currentAvailable = true;
