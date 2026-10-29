@@ -4,7 +4,7 @@ O código CAMEO e a presença de dois países não demonstram uma guerra. O regi
 
 ## Unidade principal e seleção
 
-O servidor consulta Events e GKG do mesmo lote obtido. PAGE_TITLE fornece a manchete original; temas pertencem à mesma URL. Links ou menções num artigo diferente não transferem contexto. A API não consulta páginas arbitrárias nem atribui confiança com base no nome do veículo.
+O servidor consulta Events e GKG do mesmo lote obtido para enriquecer extrações. Notícias GKG também são coletadas independentemente da existência de extrações CAMEO. Na primeira carga, recupera até oito lotes (janela de duas horas); nas seguintes busca apenas contextos pendentes nessa janela. PAGE_TITLE fornece a manchete original; temas pertencem à mesma URL. Links ou menções num artigo diferente não transferem contexto. A API não consulta páginas arbitrárias nem atribui confiança com base no nome do veículo.
 
 Notícias do GKG precisam de combinação de manchete com assunto específico e temas como ARMEDCONFLICT, CEASEFIRE, SANCTIONS, MILITARY ou terrorismo, conforme a regra. A data de referência precisa estar nas últimas 72 horas: usa publicação quando informada, senão indexação explicitamente identificada. Pelo menos um país nomeado e referência de país correspondente no GKG são requisitos. Não são criados atores, papéis estatais, códigos CAMEO, posições de tropas ou relações agressor/alvo para essas matérias.
 
@@ -23,6 +23,10 @@ Nas notícias, eventDate usa publicação informada pela fonte ou indexação, c
 ## Operação e falhas
 
 O GKG comprimido é limitado a 10 MB, com arquivo expandido abaixo de 64 MB e timeout de seis segundos. O destino é fixo em data.gdeltproject.org e deriva do lote efetivamente obtido. Falhas de contexto não liberam o feed bruto: permanecem apenas registros já disponíveis que passam pela política. Cache, scope=all e fallback desatualizado aplicam a mesma triagem. A demonstração continua explicitamente ilustrativa.
+
+A recuperação usa duas transferências por vez, com orçamento total de 48 segundos por coleta. Lotes incompletos não são marcados como concluídos: voltam a ser tentados após um minuto e a interface mostra “Coleta incompleta”. Sem contexto do lote atual, o modo é desatualizado ou indisponível; uma resposta HTTP bem-sucedida não basta para anunciar feed atualizado. A versão news-v3 invalida a conclusão indevida do cache anterior. Logs distinguem lote, status HTTP e erro de processamento. contextBatchDates contabiliza contextos efetivamente processados; a janela inicial não equivale a sete dias de cobertura retroativa.
+
+Um 404 GKG recebe uma única revalidação no mesmo host, com parâmetro de cache estável por cinco minutos e dentro do mesmo orçamento. Isso permite recuperar arquivos publicados cujo 404 ficou armazenado em um ponto regional do CDN. Persistindo a falha, a cobertura continua marcada como parcial.
 
 quality informa registros avaliados, selecionados, excluídos/deduplicados e selecionados com contexto. Esses números não são taxa de acurácia, fatos confirmados ou cobertura do noticiário mundial. Os filtros da interface podem reduzir o conjunto selecionado depois da triagem.
 

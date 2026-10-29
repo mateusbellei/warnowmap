@@ -28,6 +28,17 @@ function row(
   return fields.join("\t");
 }
 describe("notícia como unidade principal", () => {
+  it("não converte ameaças comerciais ou metáforas eleitorais em incidentes militares", () => {
+    for (const title of [
+      "CPKC head calls out alleged threats to shippers who oppose major U.S. rail merger",
+      "Michael Douglas Tells British Audience 'I'm Hoping for a Massacre' for Trump in Midterms",
+    ])
+      expect(articleTopic(title, ["ARMEDCONFLICT", "MILITARY"])).toBeNull();
+    expect(
+      articleTopic("Iran threatens missile strikes on US bases", ["MILITARY"])
+        ?.kind,
+    ).toBe("tension");
+  });
   it("publica a manchete real sem inventar código CAMEO, atores ou guerra entre países", () => {
     const [news] = newsFromGkg(
       row("Russian drones attack Ukraine in renewed offensive"),

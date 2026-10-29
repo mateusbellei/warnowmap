@@ -61,7 +61,7 @@ export interface EconomicImpact {
   context: string;
 }
 export interface EventFeed {
-  pipelineVersion?: "news-v2";
+  pipelineVersion?: "news-v2" | "news-v3";
   quality?: {
     policy: "conflict-v1";
     evaluated: number;
@@ -82,6 +82,8 @@ export interface EventFeed {
     retentionDays: number;
     persistence?: "ephemeral" | "persistent";
     batchDates?: string[];
+    contextBatchDates?: string[];
+    contextStatus?: "complete" | "partial";
   };
 }
 export const kindLabels: Record<EventKind, string> = {
