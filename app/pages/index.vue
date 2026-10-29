@@ -94,12 +94,6 @@ const visitChanges = computed(() =>
   historyChanges(feed.value, previousVisit.value),
 );
 const newEvents = computed(() => visitChanges.value.events);
-watch(
-  () => visitChanges.value.available,
-  (available) => {
-    if (!available) onlyNew.value = false;
-  },
-);
 function setWindow(hours: number) {
   basis.value = "collected";
   windowHours.value = hours;
@@ -146,6 +140,13 @@ const loading = computed(
     (status.value === "idle" && !feed.value && !error.value),
 );
 const isDemo = computed(() => feed.value?.mode === "demo");
+watch(
+  () => visitChanges.value.available,
+  (available) => {
+    if (!available) onlyNew.value = false;
+  },
+);
+
 const days = computed(() => calendarDays(from.value, to.value));
 const cutoff = computed(
   () => days.value[Math.min(cursor.value, days.value.length - 1)] ?? "",
