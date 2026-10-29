@@ -18,7 +18,7 @@ A cartografia nacional Natural Earth 1:110m é pública e local, com 177 geometr
 
 ## Cronologia e interface
 
-O mapa aparece cedo no celular; resumos extensos ficam depois dele. A cronologia apresenta situação e quantidade de publicações, com acesso à lista de origens. Há janelas de entradas de 6 h, 24 h, 7 e 30 dias, filtro por contexto e comparação com a visita anterior salva apenas no navegador. Essa comparação depende da continuidade do histórico; no modo temporário, reinícios podem alterar o conjunto disponível.
+O mapa aparece cedo no celular; resumos extensos ficam depois dele. A cronologia apresenta situação e quantidade de publicações, com acesso à lista de origens. Há janelas de entradas de 6 h, 24 h, 7 e 30 dias, filtro por contexto e comparação com a visita anterior salva apenas no navegador. Essa comparação só fica disponível quando o histórico persistente começou antes da visita anterior. No modo temporário ela permanece desativada, para que reinícios não gerem falsas novidades.
 
 A base de publicação/extração permanece separada da entrada no feed. Primeira observação local não é a data do fato. Barras listradas indicam dias sem lotes de contexto registrados; mesmo dias com lotes têm cobertura parcial. Escolher 30 dias não cria um arquivo retroativo: só aparecem dados retidos e efetivamente coletados.
 
