@@ -11,6 +11,20 @@ export function articleTopic(
   themes: string[],
 ): { kind: EventKind; reason: string } | null {
   const text = normalizeText(headline);
+  // Processos judiciais e opiniões sobre ataques não relatam uma nova ação militar.
+  if (
+    /\b(court|judge|jury|tribunal)\b.{0,65}\b(convict\w*|sentenc\w*|acquit\w*|verdict|conden\w*|absolv\w*)\b/.test(
+      text,
+    ) ||
+    /\b(false testimony|perjury|falso testemunho|perjurio)\b/.test(text) ||
+    (/(?:\d+(?:[.,]\d+)?\s*%|\b(?:poll|survey|pesquisa|sondagem)\b)/.test(
+      text,
+    ) &&
+      /\b(support\w*|favor\w*|back\w*|apoia\w*)\b.{0,50}\b(hitting|attack\w*|strike\w*|ataque\w*|bombard\w*)\b/.test(
+        text,
+      ))
+  )
+    return null;
   if (
     /election|coalition|government formation|hang onto power|eleic\w*|coligac\w*/.test(
       text,
