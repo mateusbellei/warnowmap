@@ -1,0 +1,147 @@
+.conflict-spotlight {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 18px;
+  background: linear-gradient(105deg, #3b251f, #211e1c 65%, #1a2023);
+  border-bottom: 1px solid #744335;
+  box-shadow: inset 4px 0 #ee7257;
+}
+.conflict-emblem {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border: 1px solid #a15743;
+  border-radius: 12px;
+  color: #ff9c80;
+  background: #ee72571c;
+}
+.conflict-heading {
+  flex: 1;
+  min-width: 190px;
+}
+.conflict-heading > span {
+  color: #ed9b83;
+  font-size: 9px;
+  letter-spacing: 1.6px;
+  font-weight: 600;
+}
+.conflict-heading h2 {
+  color: #fff1e9;
+  font-size: 19px;
+  margin: 5px 0;
+  letter-spacing: -0.3px;
+}
+.conflict-heading p {
+  color: #c9aaa0;
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 0;
+}
+.conflict-metrics {
+  display: flex;
+  gap: 24px;
+  padding: 0 24px;
+  border-left: 1px solid #744335;
+}
+.conflict-metrics strong {
+  display: block;
+  font-size: 29px;
+  color: #ff9c80;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.conflict-metrics span {
+  display: block;
+  font-size: 9px;
+  margin-top: 5px;
+  color: #d6bcb1;
+}
+.conflict-focus-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid #ee7257;
+  background: #ee7257;
+  color: #201512;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.conflict-focus-button:hover {
+  background: #ff9c80;
+}
+.conflict-spotlight.focused {
+  box-shadow: inset 4px 0 #ff9c80;
+}
+.focused .conflict-focus-button {
+  background: #35231e;
+  color: #ffb69e;
+  border-color: #b96d54;
+}
+.chronology-track li.armed .chronology-card {
+  border-left: 3px solid #ee7257;
+  background: linear-gradient(110deg, #382723aa, #202c32 70%);
+}
+.chronology-track li.violence .chronology-card {
+  border-left: 3px solid #d8aa65;
+  background: linear-gradient(110deg, #342d22aa, #202c32 70%);
+}
+.chronology-track li.armed .chronology-card:hover,
+.chronology-track li.armed .chronology-card.selected {
+  border-color: #ee7257;
+  background: #3c2b26;
+}
+.chronology-track li.violence .chronology-card:hover,
+.chronology-track li.violence .chronology-card.selected {
+  border-color: #d8aa65;
+  background: #383125;
+}
+@media (max-width: 760px) {
+  .conflict-spotlight {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 14px;
+  }
+  .conflict-emblem {
+    display: none;
+  }
+  .conflict-heading {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .conflict-heading h2 {
+    font-size: 17px;
+  }
+  .conflict-heading > span {
+    font-size: 8px;
+  }
+  .conflict-metrics {
+    padding: 0;
+    border: 0;
+    flex: 1;
+    gap: 18px;
+    min-width: 0;
+  }
+  .conflict-metrics strong {
+    font-size: 23px;
+  }
+  .conflict-metrics span {
+    font-size: 8px;
+  }
+  .conflict-focus-button {
+    font-size: 9px;
+    padding: 9px;
+    gap: 6px;
+  }
+  .conflict-focus-button > svg:last-child {
+    display: none;
+  }
+}

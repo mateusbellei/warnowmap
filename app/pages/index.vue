@@ -53,7 +53,17 @@ const country = ref(
 const pair = ref(typeof route.query.pair === "string" ? route.query.pair : "");
 const interstateOnly = ref(true);
 const stateOnly = ref(true);
-const kinds = ref<EventKind[]>(["armed", "violence", "tension", "diplomacy"]);
+const kinds = ref<EventKind[]>(
+  route.query.focus === "conflicts"
+    ? ["armed", "violence"]
+    : ["armed", "violence", "tension", "diplomacy"],
+);
+const conflictFocus = computed(
+  () =>
+    kinds.value.length === 2 &&
+    kinds.value.includes("armed") &&
+    kinds.value.includes("violence"),
+);
 const basis = ref<"event" | "collected">("event");
 const order = ref<"asc" | "desc">("desc");
 const now = ref(Date.now());
@@ -206,6 +216,8 @@ const pairLabel = computed(
   () => relations.value.find((relation) => relation.key === pair.value)?.label,
 );
 const counts = computed(() => ({
+  combat: events.value.filter((e) => e.kind === "armed").length,
+  violence: events.value.filter((e) => e.kind === "violence").length,
   armed: events.value.filter((e) => ["armed", "violence"].includes(e.kind))
     .length,
   diplomacy: events.value.filter((e) => e.kind === "diplomacy").length,
@@ -245,6 +257,12 @@ function toggleKind(kind: EventKind) {
   kinds.value = kinds.value.includes(kind)
     ? kinds.value.filter((value) => value !== kind)
     : [...kinds.value, kind];
+}
+function toggleConflictFocus() {
+  kinds.value = conflictFocus.value
+    ? ["armed", "violence", "tension", "diplomacy"]
+    : ["armed", "violence"];
+  mobileMap.value = true;
 }
 function choose(id: string) {
   selected.value = selected.value === id ? null : id;
@@ -325,7 +343,7 @@ watch(showAbout, (value) => {
   if (value) aboutPanel.value?.showModal();
   else aboutPanel.value?.close();
 });
-watch([search, country, pair, demo, economicOnly], () => {
+watch([search, country, pair, demo, economicOnly, conflictFocus], () => {
   router.replace({
     query: {
       q: search.value || undefined,
@@ -333,6 +351,7 @@ watch([search, country, pair, demo, economicOnly], () => {
       pair: pair.value || undefined,
       demo: demo.value ? "true" : undefined,
       economy: economicOnly.value ? "true" : undefined,
+      focus: conflictFocus.value ? "conflicts" : undefined,
     },
   });
 });
@@ -505,6 +524,45 @@ onBeforeUnmount(() => {
           class="monitor diplomacy-monitor"
           aria-label="Monitor de confrontos e diplomacia"
         >
+          <section
+            class="conflict-spotlight"
+            :class="{ focused: conflictFocus }"
+            aria-label="Conflitos em destaque"
+          >
+            <div class="conflict-emblem"><Crosshair :size="24" /></div>
+            <div class="conflict-heading">
+              <span>MONITOR DE CONFLITOS</span>
+              <h2>Conflitos em destaque</h2>
+              <p>
+                {{
+                  loading
+                    ? "Consultando relatos do recorte…"
+                    : counts.armed
+                      ? "Confrontos e violência relatados neste recorte."
+                      : "Sem relatos de confronto ou violência neste recorte."
+                }}
+              </p>
+            </div>
+            <div class="conflict-metrics">
+              <div>
+                <strong>{{ loading ? "—" : counts.combat }}</strong
+                ><span>confrontos armados</span>
+              </div>
+              <div>
+                <strong>{{ loading ? "—" : counts.violence }}</strong
+                ><span>relatos de violência</span>
+              </div>
+            </div>
+            <button
+              class="conflict-focus-button"
+              :aria-pressed="conflictFocus"
+              @click="toggleConflictFocus"
+            >
+              <Crosshair :size="15" />{{
+                conflictFocus ? "Ver todas as categorias" : "Focar conflitos"
+              }}<ArrowRight :size="15" />
+            </button>
+          </section>
           <div class="monitor-toolbar">
             <div class="view-title">
               <span class="live-dot" /><strong>{{
