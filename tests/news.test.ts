@@ -167,6 +167,16 @@ describe("países e manchete", () => {
       headlineCountries("US embargo on Cuba").map((country) => country.code),
     ).toEqual(["USA", "CUB"]);
     expect(headlineCountries("Tell us about the war")).toEqual([]);
+    expect(
+      headlineCountries("US sanctions Rwandan defence ministry over M23 ties")
+        .map((country) => country.code)
+        .sort(),
+    ).toEqual(["RWA", "USA"]);
+    expect(
+      headlineCountries("Sudanese and Ethiopian officials discuss a ceasefire")
+        .map((country) => country.code)
+        .sort(),
+    ).toEqual(["ETH", "SDN"]);
   });
   it("decodifica texto indexado com entidades, Unicode e CDATA sem interpretar HTML", () => {
     expect(

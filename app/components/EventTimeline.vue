@@ -12,6 +12,7 @@ const props = defineProps<{
   selected: string | null;
   basis: "event" | "collected";
   loading: boolean;
+  view?: "reports" | "groups";
 }>();
 defineEmits<{ select: [id: string] }>();
 const visible = ref(40);
@@ -52,7 +53,7 @@ const timeLabel = (date: string) =>
       </div>
       <span
         >{{ events.length }}
-        {{ events.length === 1 ? "acontecimento" : "acontecimentos" }}</span
+        {{ view === "groups" ? "grupos" : "notícias" }}</span
       >
     </header>
     <p class="chronology-note">
@@ -96,7 +97,10 @@ const timeLabel = (date: string) =>
               :aria-pressed="selected === event.id"
               @click="$emit('select', event.id)"
             >
-              <div v-if="event.reportCount" class="occurrence-badges">
+              <div
+                v-if="view === 'groups' && (event.reportCount ?? 0) > 1"
+                class="occurrence-badges"
+              >
                 <span
                   >{{ event.reportCount }}
                   {{
@@ -137,11 +141,6 @@ const timeLabel = (date: string) =>
                 >
               </div>
               <h4>{{ event.title }}</h4>
-              <span v-if="event.selection" class="selection-badge">{{
-                event.selection.basis === "context"
-                  ? "Triagem com contexto do artigo"
-                  : "Sinal militar · contexto limitado"
-              }}</span>
               <div v-if="event.economy" class="timeline-economy">
                 <span class="economy-badge"
                   >$
@@ -156,10 +155,15 @@ const timeLabel = (date: string) =>
                 >
                 <span>{{ event.economy.label }}</span>
               </div>
-              <p>{{ event.location }}</p>
+              <p class="timeline-location">
+                {{ event.location
+                }}<span v-if="event.locationPrecision === 'country'">
+                  · referência nacional</span
+                >
+              </p>
               <div class="event-footer">
                 <span><span class="source-dot" />{{ event.source }}</span
-                ><ArrowUpRight :size="14" />
+                ><span>Ver detalhes <ArrowUpRight :size="14" /></span>
               </div>
             </button>
           </li>
