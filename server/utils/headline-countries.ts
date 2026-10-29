@@ -34,6 +34,15 @@ const extra: Record<string, string[]> = {
   KOR: ["South Korea", "South Korean", "Coreia do Sul", "S. Korea", "S.Korea"],
   TUR: ["Turkey", "Turkish", "Türkiye", "Turquia"],
   SYR: ["Syria", "Syrian", "Síria"],
+  RWA: ["Rwandan", "ruandês", "ruandesa"],
+  SDN: ["Sudanese", "sudanês", "sudanesa"],
+  ETH: ["Ethiopian", "etíope"],
+  LBN: ["Lebanese", "libanês", "libanesa"],
+  YEM: ["Yemeni", "iemenita"],
+  IRQ: ["Iraqi", "iraquiano", "iraquiana"],
+  PAK: ["Pakistani", "paquistanês", "paquistanesa"],
+  CUB: ["Cuban", "cubano", "cubana"],
+  QAT: ["Qatari", "catariano", "catariana"],
 };
 const entries = Object.entries(isoCountries.getAlpha3Codes()).map(
   ([code, alpha2]) => {

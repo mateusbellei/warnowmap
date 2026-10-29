@@ -1,7 +1,11 @@
 import type { EventFeed } from "../../shared/types/conflict";
 import { demoEvents } from "../data/demo";
 import { selectEditorial } from "../utils/editorial";
-import { groupOccurrences } from "../../shared/utils/occurrences";
+import {
+  groupOccurrences,
+  presentPublications,
+} from "../../shared/utils/occurrences";
+import { eventsInPeriod, validPeriod } from "../../shared/utils/period";
 import { collectFeed } from "../services/collector";
 import { configuredRepository } from "../services/ingestion";
 let pending: Promise<EventFeed> | undefined;
@@ -10,6 +14,15 @@ let cached: { expires: number; feed: EventFeed } | undefined;
 export default defineEventHandler(async (event): Promise<EventFeed> => {
   setHeader(event, "Cache-Control", "no-store");
   const scope = getQuery(event).scope;
+  const query = getQuery(event);
+  const view = query.view === "reports" ? "reports" : "groups";
+  const from = typeof query.from === "string" ? query.from : "";
+  const to = typeof query.to === "string" ? query.to : "";
+  if ((from || to) && !validPeriod(from, to))
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Invalid period; use ISO dates, up to 90 days",
+    });
   const present = (feed: EventFeed): EventFeed => {
     const selection =
       feed.mode === "demo"
@@ -19,9 +32,25 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
       feed.mode === "demo"
         ? selection.events
         : groupOccurrences(selection.events);
+    const periodReports =
+      from && to
+        ? eventsInPeriod(
+            selection.events,
+            from,
+            to,
+            query.basis === "collected" ? "collected" : "event",
+          )
+        : selection.events;
+    const presented =
+      feed.mode === "demo"
+        ? periodReports
+        : view === "reports"
+          ? presentPublications(periodReports)
+          : groupOccurrences(periodReports);
     return {
       ...feed,
       pipelineVersion: "monitor-v1",
+      view,
       quality:
         feed.mode === "demo"
           ? undefined
@@ -69,11 +98,11 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
         : {}),
       events:
         scope === "bilateral" || scope === "state"
-          ? occurrences.filter(
+          ? presented.filter(
               (item) =>
                 !!item.countryPair && (scope !== "state" || item.stateLinked),
             )
-          : occurrences,
+          : presented,
     };
   };
   const config = useRuntimeConfig(event);

@@ -96,6 +96,7 @@ export interface EconomicImpact {
   context: string;
 }
 export interface EventFeed {
+  view?: "reports" | "groups";
   pipelineVersion?: "news-v2" | "news-v3" | "monitor-v1";
   summary?: {
     reports: number;

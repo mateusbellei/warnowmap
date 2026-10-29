@@ -54,6 +54,31 @@ function newsArchive(date: string) {
   return zipSync({ [`${date}.gkg.csv`]: strToU8(row.join("\t")) }).buffer;
 }
 describe("API de relatos", () => {
+  it("reage a datas e modo de apresentação no mesmo cache sem coletar novamente", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
+    const date = stamp();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("lastupdate.txt"))
+        return `100 hash http://data.gdeltproject.org/gdeltv2/${date}.export.CSV.zip`;
+      if (url.endsWith(".export.CSV.zip"))
+        return zipSync({ "empty.export.CSV": strToU8("") }).buffer;
+      return newsArchive(/\/(\d{14})\.gkg/.exec(url)![1]!);
+    });
+    const api = await handler();
+    query = { view: "reports", from: "2026-10-01", to: "2026-10-29" };
+    const reports = await api({});
+    const calls = fetchMock.mock.calls.length;
+    expect(reports.events.length).toBeGreaterThan(1);
+    expect(reports.events.every((item) => item.reportCount === 1)).toBe(true);
+    query = { ...query, view: "groups" };
+    expect((await api({})).events).toHaveLength(1);
+    query = { ...query, from: "2026-09-01", to: "2026-09-30" };
+    expect((await api({})).events).toEqual([]);
+    query = { ...query, from: "2026-10-01", to: "2026-10-29", view: "reports" };
+    expect((await api({})).events).toHaveLength(reports.events.length);
+    expect(fetchMock.mock.calls.length).toBe(calls);
+  });
   it("mantém notícias quando os arquivos CAMEO não estão disponíveis", async () => {
     const date = stamp();
     fetchMock.mockImplementation(async (url: string) => {

@@ -6,7 +6,7 @@ export function filterEvents(
     search: string;
     region: Region;
     kinds: EventKind[];
-    hours: number;
+    hours?: number;
     now: number;
     militaryOnly?: boolean;
     interstateOnly?: boolean;
@@ -46,7 +46,9 @@ export function filterEvents(
       (filters.region === "Todas as regiões" ||
         event.region === filters.region) &&
       filters.kinds.includes(event.kind) &&
-      (event.demo || (age >= -900000 && age <= filters.hours * 3600000))
+      (event.demo ||
+        filters.hours === undefined ||
+        (age >= -900000 && age <= filters.hours * 3600000))
     );
   });
 }

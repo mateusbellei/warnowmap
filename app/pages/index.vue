@@ -26,7 +26,6 @@ import {
 } from "@lucide/vue";
 import {
   regions,
-  actorRoleLabels,
   kindLabels,
   type EventKind,
   type EventFeed,
@@ -42,8 +41,12 @@ import {
   timelineDays,
 } from "#shared/utils/timeline";
 
+import {
+  defaultMonth,
+  validPeriod,
+  eventsInPeriod,
+} from "#shared/utils/period";
 const route = useRoute();
-const roleLabel = (role: string) => actorRoleLabels[role] ?? "Outro papel";
 const router = useRouter();
 const demo = ref(route.query.demo === "true");
 const search = ref(
@@ -67,21 +70,36 @@ const conflictFocus = computed(
     kinds.value.includes("armed") &&
     kinds.value.includes("violence"),
 );
-const basis = ref<"event" | "collected">("event");
+const basis = ref<"event" | "collected">(
+  route.query.basis === "collected" ? "collected" : "event",
+);
 const order = ref<"asc" | "desc">("desc");
 const now = ref(Date.now());
 const today = () => new Date().toISOString().slice(0, 10);
-const weekStart = (end: string) =>
-  new Date(Date.parse(`${end}T12:00:00Z`) - 6 * 86400000)
-    .toISOString()
-    .slice(0, 10);
-const from = ref(weekStart(today()));
-const to = ref(today());
-const cursor = ref(6);
+const initialMonth = defaultMonth(today());
+const initialFrom =
+  typeof route.query.from === "string" ? route.query.from : "";
+const initialTo = typeof route.query.to === "string" ? route.query.to : "";
+const from = ref(
+  validPeriod(initialFrom, initialTo) ? initialFrom : initialMonth.from,
+);
+const to = ref(
+  validPeriod(initialFrom, initialTo) ? initialTo : initialMonth.to,
+);
+const rangeValid = computed(() => validPeriod(from.value, to.value));
+const cursor = ref(29);
+const resultView = ref<"reports" | "groups">(
+  route.query.view === "groups" ? "groups" : "reports",
+);
+const resultUnit = computed(() =>
+  resultView.value === "reports" ? "notícias" : "grupos",
+);
 const playing = ref(false);
 const paused = ref(false);
 const heatmap = ref(false);
-const windowHours = ref(168);
+const windowHours = ref<number | null>(
+  validPeriod(initialFrom, initialTo) ? null : 720,
+);
 const onlyNew = ref(false);
 const previousVisit = ref<string | null>(null);
 const dossier = ref("");
@@ -94,13 +112,25 @@ const visitChanges = computed(() =>
   historyChanges(feed.value, previousVisit.value),
 );
 const newEvents = computed(() => visitChanges.value.events);
+function customPeriod() {
+  windowHours.value = null;
+  resetCursor();
+}
 function setWindow(hours: number) {
-  basis.value = "collected";
   windowHours.value = hours;
-  to.value = today();
-  from.value = new Date(Date.now() - hours * 3600000)
-    .toISOString()
-    .slice(0, 10);
+  to.value = isDemo.value ? "2024-04-06" : today();
+  if (hours <= 24) {
+    basis.value = "collected";
+    from.value = new Date(Date.now() - hours * 3600000)
+      .toISOString()
+      .slice(0, 10);
+  } else {
+    from.value = new Date(
+      Date.parse(to.value + "T12:00:00Z") - (hours / 24 - 1) * 86400000,
+    )
+      .toISOString()
+      .slice(0, 10);
+  }
   resetCursor();
 }
 const dossiers = computed(() => [
@@ -126,6 +156,10 @@ const {
 } = await useFetch<EventFeed>("/api/events", {
   query: {
     demo,
+    view: resultView,
+    from: computed(() => (rangeValid.value ? from.value : undefined)),
+    to: computed(() => (rangeValid.value ? to.value : undefined)),
+    basis,
     scope: computed(() =>
       interstateOnly.value ? (stateOnly.value ? "state" : "bilateral") : "all",
     ),
@@ -164,7 +198,6 @@ const baseEvents = computed(() =>
       search: search.value,
       region: region.value,
       kinds: kinds.value,
-      hours: windowHours.value,
       now: now.value,
       interstateOnly: interstateOnly.value,
       stateOnly: stateOnly.value,
@@ -175,11 +208,14 @@ const baseEvents = computed(() =>
   ),
 );
 const inPeriod = computed(() =>
-  baseEvents.value.filter((event) => {
-    const date =
-      basis.value === "event" ? event.eventDate : event.reportedAt.slice(0, 10);
-    return days.value.length > 0 && date >= from.value && date <= to.value;
-  }),
+  eventsInPeriod(
+    baseEvents.value,
+    from.value,
+    to.value,
+    basis.value,
+    windowHours.value && windowHours.value <= 24 ? windowHours.value : null,
+    now.value,
+  ),
 );
 const events = computed(() =>
   sortTimeline(
@@ -338,7 +374,7 @@ function resetCursor() {
 function clearFilters() {
   dossier.value = "";
   onlyNew.value = false;
-  windowHours.value = 168;
+  windowHours.value = 720;
   economicOnly.value = false;
   onlyInView.value = false;
   search.value = "";
@@ -351,7 +387,7 @@ function clearFilters() {
   basis.value = "event";
   order.value = "desc";
   const end = isDemo.value ? "2024-04-06" : today();
-  from.value = weekStart(end);
+  from.value = defaultMonth(end).from;
   to.value = end;
   resetCursor();
 }
@@ -380,7 +416,10 @@ function keyboard(event: KeyboardEvent) {
     document.querySelector<HTMLInputElement>(".search-field input")?.focus();
   }
 }
-watch([from, to, basis], resetCursor);
+watch([from, to, basis], resetCursor, { flush: "sync" });
+watch(resultView, () => {
+  selected.value = null;
+});
 watch(events, (values) => {
   if (selected.value && !values.some((event) => event.id === selected.value))
     selected.value = null;
@@ -393,9 +432,13 @@ watch(
       pair.value = "";
       search.value = "";
     }
+    if (previous === undefined && !value) {
+      resetCursor();
+      return;
+    }
     const end = value ? "2024-04-06" : today();
     to.value = end;
-    from.value = weekStart(end);
+    from.value = defaultMonth(end).from;
     resetCursor();
   },
   { immediate: true },
@@ -404,18 +447,36 @@ watch(showAbout, (value) => {
   if (value) aboutPanel.value?.showModal();
   else aboutPanel.value?.close();
 });
-watch([search, country, pair, demo, economicOnly, conflictFocus], () => {
-  router.replace({
-    query: {
-      q: search.value || undefined,
-      country: country.value || undefined,
-      pair: pair.value || undefined,
-      demo: demo.value ? "true" : undefined,
-      economy: economicOnly.value ? "true" : undefined,
-      focus: conflictFocus.value ? "conflicts" : undefined,
-    },
-  });
-});
+watch(
+  [
+    search,
+    country,
+    pair,
+    demo,
+    economicOnly,
+    conflictFocus,
+    from,
+    to,
+    basis,
+    resultView,
+  ],
+  () => {
+    router.replace({
+      query: {
+        from: from.value,
+        to: to.value,
+        basis: basis.value,
+        view: resultView.value,
+        q: search.value || undefined,
+        country: country.value || undefined,
+        pair: pair.value || undefined,
+        demo: demo.value ? "true" : undefined,
+        economy: economicOnly.value ? "true" : undefined,
+        focus: conflictFocus.value ? "conflicts" : undefined,
+      },
+    });
+  },
+);
 let poller: ReturnType<typeof setInterval>;
 let replay: ReturnType<typeof setInterval>;
 onMounted(() => {
@@ -669,10 +730,7 @@ onBeforeUnmount(() => {
                 pairLabel || "Confrontos e diplomacia"
               }}</strong
               ><span class="toolbar-divider" /><span class="muted"
-                >{{ events.length }}
-                {{
-                  events.length === 1 ? "acontecimento" : "acontecimentos"
-                }}</span
+                >{{ events.length }} {{ resultUnit }}</span
               >
             </div>
             <div class="toolbar-actions">
@@ -728,11 +786,73 @@ onBeforeUnmount(() => {
                 : "Inclui conflitos internos. Países são menções ou afiliações; não indicam agressor ou alvo."
             }}</span>
           </div>
+          <section class="period-controls" aria-label="Período das notícias">
+            <div class="time-inputs">
+              <label
+                >De<input
+                  v-model="from"
+                  type="date"
+                  @change="customPeriod"
+                  aria-label="Data inicial" /></label
+              ><label
+                >Até<input
+                  v-model="to"
+                  type="date"
+                  @change="customPeriod"
+                  aria-label="Data final" /></label
+              ><label class="time-basis"
+                >Ordenar por<select
+                  v-model="basis"
+                  @change="customPeriod"
+                  aria-label="Base temporal"
+                >
+                  <option value="event">Data da notícia / relato</option>
+                  <option value="collected">Entrada no feed</option>
+                </select></label
+              >
+            </div>
+            <p v-if="!rangeValid" role="alert">
+              Escolha datas válidas, em ordem, para um período de até 90 dias.
+            </p>
+            <p v-else class="period-coverage">
+              {{ from }} → {{ to }} · {{ inPeriod.length }}
+              {{ resultUnit }} disponíveis.
+              <template v-if="!isDemo"
+                >O período consulta o acervo coletado; dias sem coleta não têm
+                cobertura garantida.
+                <span v-if="feed?.coverage"
+                  >Coleta disponível:
+                  {{ feed.coverage.firstCollectedAt.slice(0, 10) }} a
+                  {{ feed.coverage.lastCollectedAt.slice(0, 10) }}.</span
+                >
+              </template>
+            </p>
+          </section>
+          <section
+            class="results-view"
+            aria-label="Apresentação dos resultados"
+          >
+            <button
+              :aria-pressed="resultView === 'reports'"
+              @click="resultView = 'reports'"
+            >
+              Notícias individuais
+            </button>
+            <button
+              :aria-pressed="resultView === 'groups'"
+              @click="resultView = 'groups'"
+            >
+              Agrupar repetidas
+            </button>
+            <span>{{
+              loading ? "Atualizando…" : events.length + " " + resultUnit
+            }}</span>
+          </section>
           <section
             class="quick-windows"
             aria-label="Recorte rápido e novidades"
           >
-            <span>Entradas</span
+            <span>Últimos</span
             ><button
               v-for="window in [
                 { h: 6, label: '6 h' },
@@ -902,6 +1022,7 @@ onBeforeUnmount(() => {
                 :selected="selected"
                 :basis="basis"
                 :loading="loading"
+                :view="resultView"
                 @select="choose"
               />
             </div>
@@ -926,8 +1047,8 @@ onBeforeUnmount(() => {
               >
               <div class="map-topline">
                 <span
-                  ><Globe2 :size="13" />MAPA GLOBAL ·
-                  {{ events.length }} ACONTECIMENTOS</span
+                  ><Globe2 :size="13" />MAPA GLOBAL · {{ events.length }}
+                  {{ resultUnit.toUpperCase() }}</span
                 >
                 <button
                   class="area-filter"
@@ -955,9 +1076,9 @@ onBeforeUnmount(() => {
                 <span>•</span> WGS 84
               </div>
               <div class="map-reading-note">
-                Áreas azuis: países citados · contadores: acontecimentos ·
-                pontos: coordenadas extraídas, sem confirmação de ataque ·
-                contagens por país não são somáveis · dourado: economia
+                Áreas azuis: países citados · contadores: relatos · pontos:
+                coordenadas extraídas, sem confirmação de ataque · contagens por
+                país não são somáveis · dourado: economia
               </div>
               <div class="map-legend">
                 <span><i class="armed" />Confronto</span
@@ -966,190 +1087,11 @@ onBeforeUnmount(() => {
                 ><span><i class="violence" />Violência</span
                 ><span class="economy-legend"><b>$</b>Economia</span>
               </div>
-              <section
+              <EventDetail
                 v-if="active"
-                class="event-detail"
-                aria-label="Detalhes do relato"
-              >
-                <div class="detail-top">
-                  <span class="event-category" :class="active.kind">{{
-                    kindLabels[active.kind]
-                  }}</span
-                  ><button
-                    class="icon-button"
-                    aria-label="Fechar detalhes"
-                    @click="selected = null"
-                  >
-                    <X :size="17" />
-                  </button>
-                </div>
-                <div v-if="active.countries.length" class="country-relation">
-                  <small class="affiliation-label">{{
-                    active.countryBasis === "headline"
-                      ? "Países citados na manchete"
-                      : "Afiliações dos atores indexados"
-                  }}</small>
-                  <template
-                    v-for="(country, index) in active.countries"
-                    :key="country.code"
-                    ><span v-if="index" class="relation-link">·</span
-                    ><span>{{ country.name }}</span></template
-                  >
-                </div>
-                <h2>{{ active.title }}</h2>
-                <p v-if="!active.demo" class="classification-note">
-                  Manchete indexada da fonte · classificação automática
-                  apresentada separadamente.
-                  <span v-if="active.dateBasis === 'indexed'"
-                    >Publicação não informada; a data indica indexação, não o
-                    momento do fato.</span
-                  >
-                </p>
-                <a
-                  v-if="!active.demo"
-                  :href="active.sourceUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  >Ler fonte original <ExternalLink :size="14"
-                /></a>
-                <OccurrenceContext :event="active" />
-                <section
-                  v-if="active.selection"
-                  class="selection-context"
-                  aria-label="Por que este relato entrou"
-                >
-                  <strong>{{
-                    active.selection.basis === "context"
-                      ? "Contexto de conflito identificado"
-                      : "Contexto temático indisponível"
-                  }}</strong>
-                  <p v-for="reason in active.selection.reasons" :key="reason">
-                    {{ reason }}
-                  </p>
-                  <small
-                    >Triagem automática · não é verificação editorial.</small
-                  >
-                </section>
-                <section
-                  v-if="active.economy"
-                  class="economic-context"
-                  aria-label="Contexto econômico"
-                >
-                  <span class="economy-badge"
-                    ><Landmark :size="13" />{{
-                      economicSectors[active.economy.sector]
-                    }}
-                    ·
-                    {{
-                      economicStageLabels[
-                        active.economy.stage ??
-                          (active.economy.status === "potential"
-                            ? "risk"
-                            : "measure")
-                      ]
-                    }}</span
-                  >
-                  <h3>{{ active.economy.label }}</h3>
-                  <p>{{ active.economy.context }}</p>
-                  <blockquote
-                    v-if="active.economy.evidence"
-                    class="economic-evidence"
-                  >
-                    {{ active.economy.evidence }}
-                  </blockquote>
-                  <small
-                    >{{
-                      active.demo
-                        ? "Cenário ilustrativo."
-                        : "Classificação automática da fonte abaixo."
-                    }}
-                    O vínculo causal com o conflito requer leitura da
-                    fonte.</small
-                  >
-                </section>
-                <p>
-                  {{
-                    active.sourceType === "article"
-                      ? "Países extraídos da manchete. A notícia não recebe atribuição automática de agressor ou alvo."
-                      : active.demo
-                        ? "Acontecimento ilustrativo, sem validade factual."
-                        : active.actors.length
-                          ? active.actors.join(" · ")
-                          : "Atores não identificados no registro."
-                  }}
-                </p>
-                <dl>
-                  <div>
-                    <dt>
-                      {{
-                        active.dateBasis === "publication"
-                          ? "Publicação da fonte"
-                          : active.dateBasis === "indexed"
-                            ? "Indexação da notícia"
-                            : "Data atribuída ao fato"
-                      }}
-                    </dt>
-                    <dd>{{ formatDate(active.eventDate) }}</dd>
-                  </div>
-                  <div>
-                    <dt>Entrada no feed</dt>
-                    <dd>{{ formatDate(active.reportedAt, true) }}</dd>
-                  </div>
-                  <div>
-                    <dt>Referência geográfica no texto</dt>
-                    <dd>
-                      {{ active.location
-                      }}<small v-if="active.locationPrecision === 'country'"
-                        >Somente referência ao país; não localiza o
-                        confronto.</small
-                      >
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>
-                      {{
-                        active.sourceType === "article"
-                          ? "Origem da classificação"
-                          : "Classificação CAMEO"
-                      }}
-                    </dt>
-                    <dd>
-                      {{
-                        active.sourceType === "article"
-                          ? "Manchete e temas do mesmo artigo"
-                          : active.actionCode
-                      }}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Revisão editorial</dt>
-                    <dd>
-                      {{ active.demo ? "Demonstração" : "Não realizada" }}
-                    </dd>
-                  </div>
-                </dl>
-                <div
-                  v-if="active.participants?.length"
-                  class="participant-list"
-                >
-                  <strong>Atores indexados na fonte</strong>
-                  <p v-for="(actor, index) in active.participants" :key="index">
-                    {{ actor.name }}
-                    <small
-                      >{{ actor.country?.name ?? "País não identificado" }} ·
-                      {{
-                        actor.roles.length
-                          ? actor.roles.map(roleLabel).join(", ")
-                          : "Sem papel identificado"
-                      }}</small
-                    >
-                  </p>
-                </div>
-                <small
-                  >Menções e afiliações nacionais não identificam agressores ou
-                  alvos. Ponto de referência geográfica.</small
-                >
-              </section>
+                :event="active"
+                @close="selected = null"
+              />
             </div>
           </div>
           <section
@@ -1169,27 +1111,6 @@ onBeforeUnmount(() => {
                     ? "Data da notícia ou relato"
                     : "Data de entrada no feed"
                 }}</span>
-              </div>
-              <div class="time-inputs">
-                <label
-                  >De<input
-                    v-model="from"
-                    type="date"
-                    aria-label="Data inicial" /></label
-                ><label
-                  >Até<input
-                    v-model="to"
-                    type="date"
-                    aria-label="Data final" /></label
-                ><label class="time-basis"
-                  >Ordenar por<select
-                    v-model="basis"
-                    aria-label="Base temporal"
-                  >
-                    <option value="event">Data da notícia / relato</option>
-                    <option value="collected">Entrada no feed</option>
-                  </select></label
-                >
               </div>
             </div>
             <div v-if="days.length" class="time-playback">
@@ -1240,9 +1161,7 @@ onBeforeUnmount(() => {
                   <span>{{ shortDay(from) }}</span
                   ><span
                     >{{ cutoff ? shortDay(cutoff) : "" }} · {{ events.length }}
-                    {{
-                      events.length === 1 ? "acontecimento" : "acontecimentos"
-                    }}
+                    {{ resultUnit }}
                     até esta data</span
                   ><span>{{ shortDay(to) }}</span>
                 </div>

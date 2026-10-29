@@ -530,13 +530,29 @@ watch(
           const content = document.createElement("div");
           content.className = "map-hover-content";
           const strong = document.createElement("strong");
-          strong.textContent = `${item.name} · ${item.count} acontecimentos com menção ao país`;
+          strong.textContent = `${item.name} · ${item.count} relatos com menção ao país`;
           const note = document.createElement("p");
           note.textContent =
             "Referência nacional. Não localiza ataques ou controle territorial. Clique para filtrar a cronologia.";
-          content.append(strong, note);
+          content.append(strong);
+          for (const report of props.events
+            .filter((report) =>
+              report.countries.some((country) => country.code === code),
+            )
+            .slice(0, 2)) {
+            const headline = document.createElement("p");
+            headline.className = "hover-headline";
+            headline.textContent = report.title;
+            content.append(headline);
+          }
+          content.append(note);
           popup?.remove();
-          popup = new Popup({ closeButton: false, offset: 15 })
+          popup = new Popup({
+            closeButton: false,
+            offset: 15,
+            maxWidth: "340px",
+            className: "map-inspection",
+          })
             .setLngLat(event.lngLat)
             .setDOMContent(content)
             .addTo(map);
@@ -619,6 +635,7 @@ watch(
             closeButton: false,
             closeOnClick: true,
             offset: 20,
+            maxWidth: "340px",
             className: "map-inspection",
           })
             .setLngLat(event.lngLat)
