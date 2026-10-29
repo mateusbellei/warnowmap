@@ -65,7 +65,8 @@ describe("API de relatos", () => {
       return newsArchive(/\/(\d{14})\.gkg/.exec(url)![1]!);
     });
     const result = await (await handler())({});
-    expect(result.events).toHaveLength(8);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]?.reportCount).toBe(8);
     expect(result.coverage?.contextStatus).toBe("complete");
     expect(
       fetchMock.mock.calls.filter(([url]) => String(url).includes("?retry=")),
@@ -84,7 +85,8 @@ describe("API de relatos", () => {
     });
     const api = await handler();
     const response = await api({});
-    expect(response.events).toHaveLength(8);
+    expect(response.events).toHaveLength(1);
+    expect(response.summary?.reports).toBe(8);
     expect(response.coverage?.contextBatchDates).toHaveLength(8);
     expect(response.coverage?.contextStatus).toBe("complete");
     expect(
@@ -119,7 +121,8 @@ describe("API de relatos", () => {
     const recovered = await api({});
     expect(recovered.datasetAt).toBe(failed.datasetAt);
     expect(recovered.mode).toBe("live");
-    expect(recovered.events).toHaveLength(8);
+    expect(recovered.events).toHaveLength(1);
+    expect(recovered.events[0]?.reportCount).toBe(8);
     expect(recovered.coverage?.contextStatus).toBe("complete");
     vi.restoreAllMocks();
   });
@@ -138,11 +141,13 @@ describe("API de relatos", () => {
     const api = await handler();
     const partial = await api({});
     expect(partial.mode).toBe("stale");
-    expect(partial.events).toHaveLength(7);
+    expect(partial.events).toHaveLength(1);
+    expect(partial.events[0]?.reportCount).toBe(7);
     currentAvailable = true;
     vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61000);
     const recovered = await api({});
-    expect(recovered.events).toHaveLength(8);
+    expect(recovered.events).toHaveLength(1);
+    expect(recovered.events[0]?.reportCount).toBe(8);
     expect(fetchMock).toHaveBeenCalledTimes(13); // Manifesto, exportação e único GKG pendente.
     vi.restoreAllMocks();
   });

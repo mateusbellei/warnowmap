@@ -64,7 +64,7 @@ it.skipIf(process.env.WARNOW_LIVE_AUDIT !== "1")(
         headlines: response.events.map((e) => e.title),
       });
       expect(response.coverage?.contextBatchDates?.length).toBeGreaterThan(0);
-      expect(response.events.length).toBeGreaterThanOrEqual(
+      expect(response.summary!.reports).toBeGreaterThanOrEqual(
         selected.events.length,
       );
       expect(response.events.every((e) => !!e.selection)).toBe(true);
