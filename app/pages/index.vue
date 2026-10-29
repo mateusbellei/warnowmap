@@ -595,17 +595,23 @@ onBeforeUnmount(() => {
             aria-label="Resumo de acontecimentos e publicações"
           >
             <div>
-              <strong>{{ feed?.summary?.occurrences ?? events.length }}</strong
+              <strong>{{
+                loading ? "—" : (feed?.summary?.occurrences ?? events.length)
+              }}</strong
               ><span>acontecimentos no arquivo</span>
             </div>
             <div>
-              <strong>{{ feed?.summary?.reports ?? events.length }}</strong
+              <strong>{{
+                loading ? "—" : (feed?.summary?.reports ?? events.length)
+              }}</strong
               ><span>publicações de origem</span>
             </div>
             <small>{{
-              feed?.operation?.ingestion === "on-demand"
-                ? "Coleta sob demanda"
-                : "Histórico persistente"
+              !feed
+                ? "Consultando cobertura"
+                : feed.operation?.ingestion === "on-demand"
+                  ? "Coleta sob demanda"
+                  : "Histórico persistente"
             }}</small>
           </section>
           <section

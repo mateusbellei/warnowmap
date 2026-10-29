@@ -48,7 +48,10 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
       operation: feed.operation ?? {
         ingestion: "on-demand",
         repository: "temporary",
-        lastSuccessAt: feed.fetchedAt,
+        lastSuccessAt:
+          feed.mode === "live" && feed.coverage?.contextStatus === "complete"
+            ? feed.fetchedAt
+            : null,
       },
       ...(feed.coverage
         ? {
