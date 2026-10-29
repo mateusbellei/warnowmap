@@ -54,6 +54,24 @@ function newsArchive(date: string) {
   return zipSync({ [`${date}.gkg.csv`]: strToU8(row.join("\t")) }).buffer;
 }
 describe("API de relatos", () => {
+  it("revalida uma única vez um 404 de contexto que ficou no cache regional do provedor", async () => {
+    const date = stamp();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("lastupdate.txt"))
+        return `100 hash http://data.gdeltproject.org/gdeltv2/${date}.export.CSV.zip`;
+      if (url.endsWith(".export.CSV.zip"))
+        return zipSync({ "empty.export.CSV": strToU8("") }).buffer;
+      if (url.endsWith(`${date}.gkg.csv.zip`)) throw { statusCode: 404 };
+      return newsArchive(/\/(\d{14})\.gkg/.exec(url)![1]!);
+    });
+    const result = await (await handler())({});
+    expect(result.events).toHaveLength(8);
+    expect(result.coverage?.contextStatus).toBe("complete");
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes("?retry=")),
+    ).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(11);
+  });
   it("recupera notícias de oito lotes mesmo sem extrações CAMEO e evita refazer o contexto concluído", async () => {
     const date = stamp();
     fetchMock.mockImplementation(async (url: string) => {

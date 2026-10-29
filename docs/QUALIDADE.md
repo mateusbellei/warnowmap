@@ -26,6 +26,8 @@ O GKG comprimido é limitado a 10 MB, com arquivo expandido abaixo de 64 MB e ti
 
 A recuperação usa duas transferências por vez, com orçamento total de 48 segundos por coleta. Lotes incompletos não são marcados como concluídos: voltam a ser tentados após um minuto e a interface mostra “Coleta incompleta”. Sem contexto do lote atual, o modo é desatualizado ou indisponível; uma resposta HTTP bem-sucedida não basta para anunciar feed atualizado. A versão news-v3 invalida a conclusão indevida do cache anterior. Logs distinguem lote, status HTTP e erro de processamento. contextBatchDates contabiliza contextos efetivamente processados; a janela inicial não equivale a sete dias de cobertura retroativa.
 
+Um 404 GKG recebe uma única revalidação no mesmo host, com parâmetro de cache estável por cinco minutos e dentro do mesmo orçamento. Isso permite recuperar arquivos publicados cujo 404 ficou armazenado em um ponto regional do CDN. Persistindo a falha, a cobertura continua marcada como parcial.
+
 quality informa registros avaliados, selecionados, excluídos/deduplicados e selecionados com contexto. Esses números não são taxa de acurácia, fatos confirmados ou cobertura do noticiário mundial. Os filtros da interface podem reduzir o conjunto selecionado depois da triagem.
 
 ## Auditoria

@@ -97,17 +97,40 @@ async function loadFeed(): Promise<EventFeed> {
       await Promise.all(
         missing.slice(offset, offset + 2).map(async (candidate) => {
           try {
-            const gkg = await $fetch<ArrayBuffer>(
-              candidate.url.replace(".export.CSV.zip", ".gkg.csv.zip"),
-              {
-                timeout: Math.min(6000, Math.max(1, deadline - Date.now())),
-                retry: 0,
-                responseType: "arrayBuffer",
-              },
+            const url = candidate.url.replace(
+              ".export.CSV.zip",
+              ".gkg.csv.zip",
             );
+            const options = () => ({
+              timeout: Math.min(6000, Math.max(1, deadline - Date.now())),
+              retry: 0,
+              responseType: "arrayBuffer" as const,
+            });
+            let gkg: ArrayBuffer;
+            try {
+              gkg = await $fetch<ArrayBuffer>(url, options());
+            } catch (error) {
+              if (
+                (error as { statusCode?: number }).statusCode !== 404 ||
+                Date.now() >= deadline
+              )
+                throw error;
+              // O CDN pode manter um 404 regional depois de o arquivo ser publicado.
+              // Uma única revalidação com chave estável por cinco minutos, no mesmo host.
+              gkg = await $fetch<ArrayBuffer>(
+                `${url}?retry=${Math.floor(Date.now() / 300000)}`,
+                options(),
+              );
+            }
             const text = decodeGkg(new Uint8Array(gkg));
             if (candidate.date === date)
-              incoming = enrichContext(incoming, text);
+              incoming = [
+                ...incoming.filter((item) => item.sourceType === "article"),
+                ...enrichContext(
+                  incoming.filter((item) => item.sourceType !== "article"),
+                  text,
+                ),
+              ];
             incoming.push(...newsFromGkg(text));
             completed.add(candidate.date);
           } catch (error) {
