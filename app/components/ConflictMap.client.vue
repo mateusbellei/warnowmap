@@ -319,7 +319,10 @@ watch(
     if (event)
       map?.flyTo({
         center: event.coordinates,
-        zoom: Math.max(map.getZoom(), 4.5),
+        zoom:
+          event.locationPrecision === "country"
+            ? 3
+            : Math.max(map.getZoom(), 4.5),
         duration: reducedMotion() ? 0 : 1000,
       });
   },
@@ -369,7 +372,11 @@ watch(
       map.on("style.load", addLayers);
       map.once("load", () => {
         const selected = eventIndex.value.get(props.selected ?? "");
-        if (selected) map?.jumpTo({ center: selected.coordinates, zoom: 5 });
+        if (selected)
+          map?.jumpTo({
+            center: selected.coordinates,
+            zoom: selected.locationPrecision === "country" ? 3 : 5,
+          });
         else reset();
         reportViewport();
       });
@@ -418,13 +425,18 @@ watch(
             content.append(economic);
           } else {
             const item = eventIndex.value.get(String(feature.properties?.id));
-            heading.textContent =
-              item?.countries.map((country) => country.name).join(" ↔ ") ||
-              item?.location ||
-              "Relato";
+            heading.textContent = item?.title || "Relato";
             const line = document.createElement("p");
-            line.textContent = item ? kindLabels[item.kind] : "";
+            line.textContent = item?.countries.length
+              ? `${item.countryBasis === "headline" ? "Citados na manchete" : "Afiliações dos atores"}: ${item.countries.map((country) => country.name).join(" · ")}`
+              : "Afiliações nacionais não identificadas";
             content.append(line);
+            if (item?.locationPrecision === "country") {
+              const geography = document.createElement("p");
+              geography.textContent =
+                "Referência ao país; não é a posição exata de um ataque.";
+              content.append(geography);
+            }
             if (item?.economy) {
               const economic = document.createElement("p");
               economic.textContent = `$ ${item.economy.label} · ${item.economy.status === "potential" ? "Potencial" : "Medida relatada"}`;

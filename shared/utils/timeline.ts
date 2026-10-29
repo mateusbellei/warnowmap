@@ -53,6 +53,14 @@ export function mergeHistory(
     const previous = grouped.get(key);
     if (!previous) grouped.set(key, { ...event, actors: [...event.actors] });
     else {
+      previous.participants = [
+        ...new Map(
+          [...(previous.participants ?? []), ...(event.participants ?? [])].map(
+            (actor) => [JSON.stringify(actor), actor],
+          ),
+        ).values(),
+      ];
+      previous.articleContext ??= event.articleContext;
       previous.actors = [...new Set([...previous.actors, ...event.actors])];
       previous.stateLinked ||= event.stateLinked;
       previous.military ||= event.military;

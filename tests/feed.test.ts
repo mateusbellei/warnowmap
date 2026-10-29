@@ -40,6 +40,65 @@ async function handler() {
   ) => Promise<EventFeed>;
 }
 describe("API de relatos", () => {
+  it("cruza o GKG do lote, prioriza a notícia e não publica a associação incidental dos atores", async () => {
+    const date = stamp();
+    const fields = Array(61).fill("");
+    Object.assign(fields, {
+      0: "123",
+      1: date.slice(0, 8),
+      6: "ACTOR A",
+      7: "USA",
+      12: "MIL",
+      16: "ACTOR B",
+      17: "IRN",
+      26: "195",
+      28: "19",
+      51: "1",
+      52: "Ukraine",
+      56: "49",
+      57: "32",
+      59: date,
+      60: "https://example.org/news",
+    });
+    const gkg = Array(27).fill("");
+    Object.assign(gkg, {
+      0: `${date}-1`,
+      1: date,
+      4: "https://example.org/news",
+      7: "ARMEDCONFLICT;MILITARY;",
+      9: "1#Russia#RS#RS#60#100#RS;1#Ukraine#UP#UP#49#32#UP",
+      26: `<PAGE_TITLE>Russian drones attack Ukraine in renewed offensive</PAGE_TITLE><PAGE_PRECISEPUBTIMESTAMP>${date}</PAGE_PRECISEPUBTIMESTAMP>`,
+    });
+    fetchMock
+      .mockResolvedValueOnce(
+        `100 hash http://data.gdeltproject.org/gdeltv2/${date}.export.CSV.zip`,
+      )
+      .mockResolvedValueOnce(
+        zipSync({ [`${date}.export.CSV`]: strToU8(fields.join("\t")) }).buffer,
+      )
+      .mockResolvedValueOnce(
+        zipSync({ [`${date}.gkg.csv`]: strToU8(gkg.join("\t")) }).buffer,
+      );
+    const api = await handler();
+    const response = await api({});
+    expect(response.events).toHaveLength(1);
+    expect(response.events[0]).toMatchObject({
+      sourceType: "article",
+      title: "Russian drones attack Ukraine in renewed offensive",
+      countryPair: "RUS:UKR",
+      actionCode: "",
+    });
+    expect(response.quality).toMatchObject({
+      evaluated: 2,
+      selected: 1,
+      rejected: 1,
+    });
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      `https://data.gdeltproject.org/gdeltv2/${date}.gkg.csv.zip`,
+    );
+    query.scope = "all";
+    expect((await api({})).events).toHaveLength(1);
+  });
   it("usa a data do lote anterior quando o arquivo do manifesto ainda retorna 404", async () => {
     fetchMock
       .mockResolvedValueOnce(
@@ -79,7 +138,19 @@ describe("API de relatos", () => {
   it("enriquece o arquivo anterior com economia mesmo com o provedor indisponível", async () => {
     stored = {
       mode: "live",
-      events: [{ ...demoEvents[0]!, actionCode: "163", demo: false }],
+      events: [
+        {
+          ...demoEvents[0]!,
+          actionCode: "163",
+          kind: "tension",
+          demo: false,
+          participants: [{ name: "GOVERNMENT", country: null, roles: ["GOV"] }],
+          articleContext: {
+            themes: ["SANCTIONS"],
+            headline: "Russia announces sanctions on Ukraine",
+          },
+        },
+      ],
       fetchedAt: "2026-10-28T12:00:00Z",
       datasetAt: "2026-10-28T12:00:00Z",
       provider: "GDELT 2.0",
@@ -188,7 +259,9 @@ describe("API de relatos", () => {
         zipSync({ [`${date}.export.CSV`]: strToU8("") }).buffer,
       );
     const result = await (await handler())({});
-    expect(result.events).toHaveLength(1);
+    expect(result.events).toHaveLength(0);
+    expect(result.quality?.rejected).toBe(1);
+    expect(stored?.events).toHaveLength(1);
     expect(result.coverage?.batches).toBe(2);
     expect(result.coverage?.firstCollectedAt).toBe(previousTime);
     expect(Date.parse(result.coverage!.lastCollectedAt)).toBeGreaterThanOrEqual(

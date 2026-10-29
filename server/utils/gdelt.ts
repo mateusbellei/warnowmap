@@ -76,11 +76,21 @@ export function parseGdeltExport(text: string): ConflictEvent[] {
             .sort()
             .join(":")
         : null;
-    const stateLinked =
-      [row[12], row[13], row[14], row[22], row[23], row[24]].some((code) =>
-        /^(GOV|MIL|ELI)$/.test(code ?? ""),
-      ) ||
-      [5, 15].some((index) => !!row[index] && row[index] === row[index + 2]);
+    const participants = [5, 15].map((index) => ({
+      name: row[index + 1]?.trim() || "Ator não identificado",
+      country: actorCountry(row[index + 2]!),
+      roles: [row[index + 7], row[index + 8], row[index + 9]].filter(
+        (role): role is string => !!role?.trim(),
+      ),
+    }));
+    const stateLinked = [
+      row[12],
+      row[13],
+      row[14],
+      row[22],
+      row[23],
+      row[24],
+    ].some((code) => /^(GOV|MIL)$/.test(code ?? ""));
     const diplomacy = ["02", "03", "04", "05", "06", "07", "08"].includes(root);
     const actors = [
       ...new Set(
@@ -101,6 +111,13 @@ export function parseGdeltExport(text: string): ConflictEvent[] {
             ? "violence"
             : "tension",
       actors,
+      participants,
+      locationPrecision:
+        row[51] === "1"
+          ? "country"
+          : row[51] === "2" || row[51] === "5"
+            ? "region"
+            : "local",
       countries: uniqueCountries,
       countryPair,
       stateLinked,
@@ -137,6 +154,13 @@ export function parseGdeltExport(text: string): ConflictEvent[] {
     const previous = grouped.get(key);
     if (!previous) grouped.set(key, event);
     else {
+      previous.participants = [
+        ...new Map(
+          [...(previous.participants ?? []), ...(event.participants ?? [])].map(
+            (actor) => [JSON.stringify(actor), actor],
+          ),
+        ).values(),
+      ];
       previous.actors = [...new Set([...previous.actors, ...event.actors])];
       previous.military ||= event.military;
       previous.stateLinked ||= event.stateLinked;
