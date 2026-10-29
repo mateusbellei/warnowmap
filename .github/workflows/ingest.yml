@@ -1,0 +1,26 @@
+name: Scheduled ingestion
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+permissions:
+  contents: read
+concurrency:
+  group: warnow-ingestion
+  cancel-in-progress: false
+jobs:
+  ingest:
+    if: vars.WARNOW_INGEST_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Collect published batches
+        env:
+          INGEST_URL: ${{ vars.WARNOW_INGEST_URL }}
+          INGEST_SECRET: ${{ secrets.WARNOW_INGEST_SECRET }}
+        shell: bash
+        run: |
+          test -n "$INGEST_URL" && test ${#INGEST_SECRET} -ge 32
+          case "$INGEST_URL" in https://*/api/admin/ingest) ;; *) echo "Invalid ingestion URL"; exit 1;; esac
+          curl --fail --silent --show-error --max-time 58 --request POST \
+            --header "Authorization: Bearer $INGEST_SECRET" "$INGEST_URL"

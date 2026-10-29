@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { eventsInView, withinBounds } from "../shared/utils/map";
+import {
+  eventsInView,
+  withinBounds,
+  countryReferences,
+} from "../shared/utils/map";
 import { demoEvents } from "../server/data/demo";
 describe("recorte geográfico visível", () => {
+  it("conta referências nacionais por acontecimento sem contar republicações nem incluir pontos locais", () => {
+    const a = {
+      ...demoEvents[0]!,
+      locationPrecision: "country" as const,
+      reports: [],
+      reportCount: 7,
+    };
+    const refs = countryReferences([
+      a,
+      a,
+      { ...a, id: "local", locationPrecision: "local" },
+    ]);
+    expect(refs).toHaveLength(a.countries.length);
+    expect(refs.every((item) => item.count === 1)).toBe(true);
+  });
   it("inclui limites e exclui pontos fora da área", () => {
     expect(withinBounds([30, 40], [20, 30, 40, 50])).toBe(true);
     expect(withinBounds([20, 30], [20, 30, 40, 50])).toBe(true);

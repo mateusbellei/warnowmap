@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ArrowUpRight, Clock3, Radio } from "@lucide/vue";
-import { kindLabels, type ConflictEvent } from "#shared/types/conflict";
+import {
+  kindLabels,
+  situationLabels,
+  type ConflictEvent,
+} from "#shared/types/conflict";
+import { economicStageLabels } from "#shared/utils/economy";
 import { groupTimeline } from "#shared/utils/timeline";
 const props = defineProps<{
   events: ConflictEvent[];
@@ -47,7 +52,7 @@ const timeLabel = (date: string) =>
       </div>
       <span
         >{{ events.length }}
-        {{ events.length === 1 ? "relato" : "relatos" }}</span
+        {{ events.length === 1 ? "acontecimento" : "acontecimentos" }}</span
       >
     </header>
     <p class="chronology-note">
@@ -91,6 +96,17 @@ const timeLabel = (date: string) =>
               :aria-pressed="selected === event.id"
               @click="$emit('select', event.id)"
             >
+              <div v-if="event.reportCount" class="occurrence-badges">
+                <span
+                  >{{ event.reportCount }}
+                  {{
+                    event.reportCount === 1 ? "publicação" : "publicações"
+                  }}</span
+                >
+                <span v-if="event.situation">{{
+                  situationLabels[event.situation]
+                }}</span>
+              </div>
               <div class="event-meta">
                 <span class="event-category" :class="event.kind">{{
                   kindLabels[event.kind]
@@ -130,9 +146,12 @@ const timeLabel = (date: string) =>
                 <span class="economy-badge"
                   >$
                   {{
-                    event.economy.status === "reported"
-                      ? "Medida relatada"
-                      : "Potencial"
+                    economicStageLabels[
+                      event.economy.stage ??
+                        (event.economy.status === "potential"
+                          ? "risk"
+                          : "measure")
+                    ]
                   }}</span
                 >
                 <span>{{ event.economy.label }}</span>

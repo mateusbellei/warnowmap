@@ -28,6 +28,19 @@ function row(
   return fields.join("\t");
 }
 describe("notícia como unidade principal", () => {
+  it("não confunde negociação de coalizão eleitoral com diplomacia de conflito por temas do contexto", () => {
+    expect(
+      articleTopic(
+        "Benjamin Netanyahu edges ahead in Israeli general election - but faces weeks of negotiations in bid to hang onto power",
+        ["ARMEDCONFLICT", "MILITARY"],
+      ),
+    ).toBeNull();
+    expect(
+      articleTopic("Israel and Iran resume peace talks after election", [
+        "ARMEDCONFLICT",
+      ])?.kind,
+    ).toBe("diplomacy");
+  });
   it("não converte ameaças comerciais ou metáforas eleitorais em incidentes militares", () => {
     for (const title of [
       "CPKC head calls out alleged threats to shippers who oppose major U.S. rail merger",

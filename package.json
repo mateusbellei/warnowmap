@@ -1,12 +1,14 @@
 {
   "name": "warnowmap",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "nuxt dev --host 127.0.0.1",
     "build": "nuxt build",
     "preview": "nuxt preview",
+    "db:migrate": "tsx --env-file-if-exists=.env scripts/db-migrate.ts",
+    "ingest": "tsx --env-file-if-exists=.env scripts/ingest.ts",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
@@ -20,12 +22,15 @@
     "i18n-iso-countries": "7.14.0",
     "maplibre-gl": "6.16.0",
     "nuxt": "4.6.3",
+    "postgres": "3.4.9",
     "vue": "3.5.44",
     "vue-router": "5.4.0"
   },
   "devDependencies": {
+    "@types/geojson": "7946.0.16",
     "@types/node": "^24.0.0",
     "prettier": "3.9.10",
+    "tsx": "4.23.15",
     "typescript": "~5.9.3",
     "vitest": "5.0.5",
     "vue-tsc": "3.3.13"

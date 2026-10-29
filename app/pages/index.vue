@@ -33,7 +33,7 @@ import {
   type Region,
 } from "#shared/types/conflict";
 import { filterEvents } from "#shared/utils/events";
-import { economicSectors } from "#shared/utils/economy";
+import { economicSectors, economicStageLabels } from "#shared/utils/economy";
 import { eventsInView, type MapBounds } from "#shared/utils/map";
 import {
   calendarDays,
@@ -80,6 +80,39 @@ const cursor = ref(6);
 const playing = ref(false);
 const paused = ref(false);
 const heatmap = ref(false);
+const windowHours = ref(168);
+const onlyNew = ref(false);
+const previousVisit = ref<string | null>(null);
+const dossier = ref("");
+const referenceOnly = computed(() =>
+  (feed.value?.events ?? []).every(
+    (item) => item.locationPrecision === "country",
+  ),
+);
+const newEvents = computed(() =>
+  (feed.value?.events ?? []).filter(
+    (item) =>
+      previousVisit.value &&
+      Date.parse(item.lastSeenAt ?? item.firstSeenAt ?? item.reportedAt) >
+        Date.parse(previousVisit.value!),
+  ),
+);
+function setWindow(hours: number) {
+  basis.value = "collected";
+  windowHours.value = hours;
+  to.value = today();
+  from.value = new Date(Date.now() - hours * 3600000)
+    .toISOString()
+    .slice(0, 10);
+  resetCursor();
+}
+const dossiers = computed(() => [
+  ...new Map(
+    (feed.value?.events ?? [])
+      .filter((item) => item.dossier)
+      .map((item) => [item.dossier!.id, item.dossier!]),
+  ).values(),
+]);
 const showFilters = ref(false);
 const showAbout = ref(false);
 const mobileMap = ref(true);
@@ -116,18 +149,28 @@ const cutoff = computed(
 );
 const atPresent = computed(() => cursor.value === days.value.length - 1);
 const baseEvents = computed(() =>
-  filterEvents(feed.value?.events ?? [], {
-    search: search.value,
-    region: region.value,
-    kinds: kinds.value,
-    hours: 168,
-    now: now.value,
-    interstateOnly: interstateOnly.value,
-    stateOnly: stateOnly.value,
-    country: country.value,
-    pair: pair.value,
-    economicOnly: economicOnly.value,
-  }),
+  filterEvents(
+    (feed.value?.events ?? []).filter(
+      (item) =>
+        (!dossier.value || item.dossier?.id === dossier.value) &&
+        (!onlyNew.value ||
+          (previousVisit.value &&
+            Date.parse(item.lastSeenAt ?? item.firstSeenAt ?? item.reportedAt) >
+              Date.parse(previousVisit.value))),
+    ),
+    {
+      search: search.value,
+      region: region.value,
+      kinds: kinds.value,
+      hours: windowHours.value,
+      now: now.value,
+      interstateOnly: interstateOnly.value,
+      stateOnly: stateOnly.value,
+      country: country.value,
+      pair: pair.value,
+      economicOnly: economicOnly.value,
+    },
+  ),
 );
 const inPeriod = computed(() =>
   baseEvents.value.filter((event) => {
@@ -155,6 +198,15 @@ const economicEvents = computed(() =>
   events.value.filter((event) => event.economy),
 );
 const economicSummary = computed(() => ({
+  stages: Object.entries(economicStageLabels).map(([key, label]) => ({
+    key,
+    label,
+    count: economicEvents.value.filter(
+      (item) =>
+        (item.economy?.stage ??
+          (item.economy?.status === "potential" ? "risk" : "measure")) === key,
+    ).length,
+  })),
   reported: economicEvents.value.filter(
     (event) => event.economy?.status === "reported",
   ).length,
@@ -282,6 +334,9 @@ function resetCursor() {
   playing.value = false;
 }
 function clearFilters() {
+  dossier.value = "";
+  onlyNew.value = false;
+  windowHours.value = 168;
   economicOnly.value = false;
   onlyInView.value = false;
   search.value = "";
@@ -362,6 +417,10 @@ watch([search, country, pair, demo, economicOnly, conflictFocus], () => {
 let poller: ReturnType<typeof setInterval>;
 let replay: ReturnType<typeof setInterval>;
 onMounted(() => {
+  try {
+    previousVisit.value = localStorage.getItem("warnow:last-visit");
+    localStorage.setItem("warnow:last-visit", new Date().toISOString());
+  } catch {}
   document.addEventListener("keydown", keyboard);
   poller = setInterval(() => {
     now.value = Date.now();
@@ -381,6 +440,9 @@ onMounted(() => {
   }, 1500);
 });
 onBeforeUnmount(() => {
+  try {
+    localStorage.setItem("warnow:last-visit", new Date().toISOString());
+  } catch {}
   clearInterval(poller);
   clearInterval(replay);
   document.removeEventListener("keydown", keyboard);
@@ -529,6 +591,24 @@ onBeforeUnmount(() => {
           aria-label="Monitor de confrontos e diplomacia"
         >
           <section
+            class="monitor-overview"
+            aria-label="Resumo de acontecimentos e publicações"
+          >
+            <div>
+              <strong>{{ feed?.summary?.occurrences ?? events.length }}</strong
+              ><span>acontecimentos no arquivo</span>
+            </div>
+            <div>
+              <strong>{{ feed?.summary?.reports ?? events.length }}</strong
+              ><span>publicações de origem</span>
+            </div>
+            <small>{{
+              feed?.operation?.ingestion === "on-demand"
+                ? "Coleta sob demanda"
+                : "Histórico persistente"
+            }}</small>
+          </section>
+          <section
             class="conflict-spotlight"
             :class="{ focused: conflictFocus }"
             aria-label="Conflitos em destaque"
@@ -582,7 +662,9 @@ onBeforeUnmount(() => {
               }}</strong
               ><span class="toolbar-divider" /><span class="muted"
                 >{{ events.length }}
-                {{ events.length === 1 ? "relato" : "relatos" }}</span
+                {{
+                  events.length === 1 ? "acontecimento" : "acontecimentos"
+                }}</span
               >
             </div>
             <div class="toolbar-actions">
@@ -638,14 +720,46 @@ onBeforeUnmount(() => {
                 : "Inclui conflitos internos. Países são menções ou afiliações; não indicam agressor ou alvo."
             }}</span>
           </div>
+          <section
+            class="quick-windows"
+            aria-label="Recorte rápido e novidades"
+          >
+            <span>Entradas</span
+            ><button
+              v-for="window in [
+                { h: 6, label: '6 h' },
+                { h: 24, label: '24 h' },
+                { h: 168, label: '7 dias' },
+                { h: 720, label: '30 dias' },
+              ]"
+              :key="window.h"
+              :class="{ active: windowHours === window.h }"
+              @click="setWindow(window.h)"
+            >
+              {{ window.label }}
+            </button>
+            <button
+              v-if="previousVisit"
+              :class="{ active: onlyNew }"
+              @click="onlyNew = !onlyNew"
+            >
+              {{ newEvents.length }} novos/atualizados desde a última visita
+            </button>
+            <select v-model="dossier" aria-label="Contexto por países citados">
+              <option value="">Todos os contextos</option>
+              <option v-for="item in dossiers" :key="item.id" :value="item.id">
+                {{ item.label }}
+              </option>
+            </select>
+          </section>
           <details v-if="feed?.quality" class="quality-summary">
             <summary>
               <SlidersHorizontal :size="13" /> Triagem de conflitos ·
               {{ feed.quality.selected }}
               {{
                 feed.quality.selected === 1
-                  ? "notícia selecionada"
-                  : "notícias selecionadas"
+                  ? "publicação selecionada"
+                  : "publicações selecionadas"
               }}
               no arquivo
             </summary>
@@ -677,12 +791,8 @@ onBeforeUnmount(() => {
               ><Check v-if="economicOnly" :size="14" />
             </button>
             <div class="economy-totals">
-              <strong
-                >{{ economicSummary.reported
-                }}<small>medidas relatadas</small></strong
-              ><strong
-                >{{ economicSummary.potential
-                }}<small>ameaças / intenções</small></strong
+              <strong v-for="stage in economicSummary.stages" :key="stage.key"
+                >{{ stage.count }}<small>{{ stage.label }}</small></strong
               >
             </div>
             <div class="economy-sectors">
@@ -793,6 +903,11 @@ onBeforeUnmount(() => {
                   :events="events"
                   :selected="selected"
                   :heatmap="heatmap"
+                  @country="
+                    country = $event;
+                    pair = '';
+                    mobileMap = false;
+                  "
                   @select="choose"
                   @viewport="mapBounds = $event"
                 /><template #fallback
@@ -804,7 +919,7 @@ onBeforeUnmount(() => {
               <div class="map-topline">
                 <span
                   ><Globe2 :size="13" />MAPA GLOBAL ·
-                  {{ events.length }} RELATOS</span
+                  {{ events.length }} ACONTECIMENTOS</span
                 >
                 <button
                   class="area-filter"
@@ -818,6 +933,8 @@ onBeforeUnmount(() => {
                       : "Filtrar pela área visível"
                   }}</button
                 ><button
+                  :disabled="referenceOnly"
+                  title="Densidade de coordenadas extraídas; referências nacionais ficam nas áreas"
                   :class="{ toggled: heatmap }"
                   :aria-pressed="heatmap"
                   @click="heatmap = !heatmap"
@@ -830,8 +947,9 @@ onBeforeUnmount(() => {
                 <span>•</span> WGS 84
               </div>
               <div class="map-reading-note">
-                Anéis: categorias · número: notícias · pontos são referências,
-                não posições de ataques · dourado: economia
+                Áreas azuis: países citados · contadores: acontecimentos ·
+                pontos: coordenadas extraídas, sem confirmação de ataque ·
+                contagens por país não são somáveis · dourado: economia
               </div>
               <div class="map-legend">
                 <span><i class="armed" />Confronto</span
@@ -886,6 +1004,7 @@ onBeforeUnmount(() => {
                   rel="noopener noreferrer"
                   >Ler fonte original <ExternalLink :size="14"
                 /></a>
+                <OccurrenceContext :event="active" />
                 <section
                   v-if="active.selection"
                   class="selection-context"
@@ -914,13 +1033,22 @@ onBeforeUnmount(() => {
                     }}
                     ·
                     {{
-                      active.economy.status === "reported"
-                        ? "Medida relatada"
-                        : "Potencial"
+                      economicStageLabels[
+                        active.economy.stage ??
+                          (active.economy.status === "potential"
+                            ? "risk"
+                            : "measure")
+                      ]
                     }}</span
                   >
                   <h3>{{ active.economy.label }}</h3>
                   <p>{{ active.economy.context }}</p>
+                  <blockquote
+                    v-if="active.economy.evidence"
+                    class="economic-evidence"
+                  >
+                    {{ active.economy.evidence }}
+                  </blockquote>
                   <small
                     >{{
                       active.demo
@@ -1077,11 +1205,16 @@ onBeforeUnmount(() => {
                     :class="{
                       reached: index <= cursor,
                       current: index === cursor,
+                      uncovered:
+                        !isDemo &&
+                        !feed?.coverage?.contextBatchDates?.some(
+                          (batch) => batch.slice(0, 10) === day,
+                        ),
                     }"
                     :title="`${day}: ${dailyCounts.get(day) ?? 0} relatos`"
                     ><i
                       :style="{
-                        height: `${Math.max(4, ((dailyCounts.get(day) ?? 0) / maxCount) * 100)}%`,
+                        height: `${((dailyCounts.get(day) ?? 0) / maxCount) * 100}%`,
                       }"
                   /></span>
                 </div>
@@ -1099,8 +1232,10 @@ onBeforeUnmount(() => {
                   <span>{{ shortDay(from) }}</span
                   ><span
                     >{{ cutoff ? shortDay(cutoff) : "" }} · {{ events.length }}
-                    {{ events.length === 1 ? "relato" : "relatos" }} até esta
-                    data</span
+                    {{
+                      events.length === 1 ? "acontecimento" : "acontecimentos"
+                    }}
+                    até esta data</span
                   ><span>{{ shortDay(to) }}</span>
                 </div>
               </div>
@@ -1145,8 +1280,9 @@ onBeforeUnmount(() => {
                     : "lotes acumulados"
                 }}
                 desde {{ formatDate(feed.coverage.firstCollectedAt, true) }} ·
-                retenção de até 7 dias / 15 mil relatos. Dias vazios podem
-                refletir lacunas de coleta.
+                retenção de até {{ feed.coverage.retentionDays }} dias / 15 mil
+                registros. Dias vazios podem refletir lacunas de coleta. Barras
+                listradas indicam dias sem lotes de contexto registrados.
                 <template v-if="feed.coverage.persistence === 'ephemeral'">
                   Histórico temporário por instância; pode reiniciar na
                   Vercel.</template
@@ -1249,17 +1385,19 @@ onBeforeUnmount(() => {
       </p>
       <h3>Cobertura e limitações</h3>
       <p>
-        Guardamos os lotes coletados sob demanda por até sete dias, limitados a
-        15 mil registros. Sem visitantes não há ingestão contínua nem garantia
-        de preencher intervalos perdidos. O histórico começa na primeira coleta
-        e não é completo ou retroativo. Datas vazias não provam ausência de
-        acontecimentos.
+        Sem banco, a coleta é sob demanda e o histórico é temporário na Vercel.
+        Com repositório persistente, o mapa lê um snapshot e a coleta é
+        executada separadamente, com retenção de até 30 dias. O agendamento
+        precisa ser ativado na hospedagem escolhida; configurar o banco sozinho
+        não o ativa. O histórico começa na primeira coleta e não é completo ou
+        retroativo. Datas vazias não provam ausência de acontecimentos.
       </p>
       <p>
-        Fontes, coordenadas e categorias podem conter erros. Exibimos uma
-        entrada por URL e priorizamos a notícia com países da manchete. Não
-        deduplicamos fatos entre veículos. O modo demonstração contém apenas
-        cenários ilustrativos.
+        Fontes, coordenadas e categorias podem conter erros. Agrupamos URLs de
+        acompanhamento e manchetes equivalentes, preservando as publicações de
+        origem. Isso não comprova independência editorial ou que matérias com
+        títulos diferentes descrevam fatos distintos. O modo demonstração contém
+        apenas cenários ilustrativos.
       </p>
       <div class="about-links">
         <a

@@ -1,4 +1,111 @@
-import type { EconomicImpact } from "../types/conflict";
+import type { EconomicImpact, ConflictEvent } from "../types/conflict";
+
+export const economicStageLabels = {
+  measure: "Medida mencionada",
+  disruption: "Interrupção relatada",
+  effect: "Efeito descrito pela fonte",
+  risk: "Risco / intenção",
+} as const;
+
+export function headlineEconomicSignal(
+  title: string,
+  themes: string[],
+): EconomicImpact | undefined {
+  const text = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const potential =
+    /\b(may|could|risk\w*|threat\w*|propos\w*|consider\w*|plans?|discuss\w*|talks|negotiat\w*|intend\w*|pode|risco\w*|ameac\w*|pretende)\b/.test(
+      text,
+    );
+  const conflict = themes.some((theme) =>
+    ["ARMEDCONFLICT", "MILITARY", "CEASEFIRE", "TERROR", "WMD"].includes(theme),
+  );
+  const linked =
+    /\b(war|conflict|guerra|conflito|hormuz|ormuz|red sea|blockade|bloqueio)\b/.test(
+      text,
+    );
+  if (
+    /sanction\w*|sancoes|sanciones|embargo/.test(text) &&
+    themes.includes("SANCTIONS")
+  )
+    return {
+      sector: "sanctions",
+      status: potential ? "potential" : "reported",
+      stage: potential ? "risk" : "measure",
+      label: "Sanções ou embargo mencionados",
+      context:
+        "Medida ou discussão relatada na manchete; não demonstra execução, perdas ou efeito econômico mensurado.",
+    };
+  if (!conflict || !linked) return undefined;
+  if (
+    /(?:oil|gas|energy|petroleo|energia).{0,25}(?:price|preco)|(?:price|preco).{0,25}(?:oil|gas|energy|petroleo)/.test(
+      text,
+    ) &&
+    /\b(surge\w*|rose|ris\w*|jump\w*|fell|fall\w*|drop\w*|sobe\w*|alta|queda)\b/.test(
+      text,
+    )
+  )
+    return {
+      sector: "trade",
+      status: potential ? "potential" : "reported",
+      stage: potential ? "risk" : "effect",
+      label: "Variação econômica descrita pela fonte",
+      context:
+        "A manchete associa variação de preços ao contexto de conflito. Sem cotação própria, estimativa de perdas ou causalidade verificada.",
+    };
+  if (
+    /shipping|ships|ports?|strait|supply|transport|freight|navios|estreito|abastecimento/.test(
+      text,
+    ) &&
+    /clos\w*|halt\w*|disrupt\w*|block\w*|suspend\w*|reopen\w*|fech\w*|interromp\w*|reabr\w*/.test(
+      text,
+    )
+  )
+    return {
+      sector: "logistics",
+      status: potential ? "potential" : "reported",
+      stage: potential ? "risk" : "disruption",
+      label: /reopen|reabr/.test(text)
+        ? "Reabertura logística relatada"
+        : "Restrição logística mencionada",
+      context:
+        "Circulação ou abastecimento mencionados em contexto de conflito; dimensão comercial e impacto não quantificados.",
+    };
+  if (
+    /economic aid|financial aid|financial assistance|ajuda economica|ajuda financeira/.test(
+      text,
+    )
+  )
+    return {
+      sector: "aid",
+      status: potential ? "potential" : "reported",
+      stage: potential ? "risk" : "measure",
+      label: "Ajuda econômica mencionada",
+      context:
+        "Anúncio ou apoio relatado; a manchete não comprova desembolso nem efeito sobre a economia.",
+    };
+  return undefined;
+}
+export function economicEvidence(
+  event: ConflictEvent,
+): EconomicImpact | undefined {
+  const signal =
+    event.sourceType === "article"
+      ? headlineEconomicSignal(event.title, event.articleContext?.themes ?? [])
+      : event.economy;
+  return signal
+    ? {
+        ...signal,
+        stage:
+          signal.stage ?? (signal.status === "potential" ? "risk" : "measure"),
+        evidence: event.title,
+        sourceUrl: event.sourceUrl,
+        date: event.eventDate,
+      }
+    : undefined;
+}
 
 export const economicSectors = {
   sanctions: "Sanções",

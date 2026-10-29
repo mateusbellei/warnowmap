@@ -12,6 +12,14 @@ export function articleTopic(
 ): { kind: EventKind; reason: string } | null {
   const text = normalizeText(headline);
   if (
+    /election|coalition|government formation|hang onto power|eleic\w*|coligac\w*/.test(
+      text,
+    ) &&
+    /negotiat|talks|negociac/.test(text) &&
+    !/peace talks|ceasefire|truce|hostage|nuclear|cessar.fogo/.test(text)
+  )
+    return null;
+  if (
     /\b(obituar\w*|dies at|died aged|morre aos|fallece a los|remembering|on this day|a look back|retrospectiv\w*)\b/.test(
       text,
     ) ||
@@ -29,6 +37,26 @@ export function articleTopic(
     ].includes(theme),
   );
   const military = conflict || themes.includes("MILITARY");
+  if (
+    conflict &&
+    /\b(war|conflict|guerra|conflito|hormuz|ormuz|red sea|blockade)\b/.test(
+      text,
+    ) &&
+    (/(?:oil|gas|energy|petroleo).{0,25}(?:price|preco).{0,25}(?:surge|ris|jump|fall|drop|sobe|alta|queda)/.test(
+      text,
+    ) ||
+      /(?:shipping|ships|port|strait|supply|transport|freight|navios|estreito).{0,35}(?:clos|halt|disrupt|block|suspend|reopen|fech|interromp|reabr)/.test(
+        text,
+      ) ||
+      /(?:clos|halt|disrupt|block|suspend|reopen|fech|interromp|reabr).{0,35}(?:shipping|ships|port|strait|supply|transport|freight|navios|estreito)/.test(
+        text,
+      ))
+  )
+    return {
+      kind: "tension",
+      reason:
+        "Manchete sobre efeito econômico ou circulação em contexto explícito de conflito",
+    };
   if (
     /sanction\w*|sancoes|sanciones|embargo/.test(text) &&
     themes.includes("SANCTIONS")
