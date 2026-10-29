@@ -150,6 +150,33 @@ describe("notícia como unidade principal", () => {
       articleTopic("Iran ceasefire talks resume", ["ARMEDCONFLICT"])?.kind,
     ).toBe("diplomacy");
   });
+  it("não transforma julgamentos ou pesquisas de apoio em violência atual, inclusive no acervo", () => {
+    for (const title of [
+      "Rwanda: Genocide - U.S. Court Convicts Rwandan Man Over False Testimony",
+      "Ukraine Invasion Day 1,708: 80% of Ukrainians support hitting RU oil refineries",
+      "Survey shows Ukrainians support strikes on Russian oil refineries",
+    ]) {
+      expect(articleTopic(title, ["ARMEDCONFLICT", "MILITARY"])).toBeNull();
+      const [stored] = newsFromGkg(row("Russian drones attack Ukraine"), now);
+      const cached = {
+        ...stored!,
+        title,
+        articleContext: {
+          headline: title,
+          themes: ["ARMEDCONFLICT", "MILITARY"],
+        },
+      };
+      expect(selectEditorial([cached]).events).toEqual([]);
+    }
+    expect(
+      articleTopic("Russian drones attack Ukraine", ["ARMEDCONFLICT"])?.kind,
+    ).toBe("armed");
+    expect(
+      articleTopic("Court orders Israel to observe ceasefire", [
+        "ARMEDCONFLICT",
+      ])?.kind,
+    ).toBe("diplomacy");
+  });
 });
 describe("países e manchete", () => {
   it("reconhece abreviações explícitas das duas Coreias sem reduzir a notícia aos EUA", () => {
