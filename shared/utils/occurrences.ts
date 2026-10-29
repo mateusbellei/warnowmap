@@ -75,6 +75,27 @@ export function classifyNarrative(event: ConflictEvent) {
     },
   };
 }
+export function presentPublications(input: ConflictEvent[]): ConflictEvent[] {
+  return input
+    .filter((event) => !!safeSourceUrl(event.sourceUrl))
+    .map((event) => ({
+      ...event,
+      ...classifyNarrative(event),
+      economy: economicEvidence(event),
+      reportCount: 1,
+      reports: [
+        {
+          id: event.id,
+          title: event.title,
+          url: event.sourceUrl,
+          source: event.source,
+          indexedAt: event.reportedAt,
+          date: event.eventDate,
+          dateBasis: event.dateBasis,
+        },
+      ],
+    }));
+}
 
 // Correspondência conservadora de publicações; não confirma identidade factual nem independência editorial.
 export function groupOccurrences(input: ConflictEvent[]): ConflictEvent[] {

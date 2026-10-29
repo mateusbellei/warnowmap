@@ -26,7 +26,7 @@ function normalizeCountryNames(feed: EventFeed | null) {
 
 export async function collectFeed(
   storage: FeedStorage,
-  retentionDays = 7,
+  retentionDays = 30,
   budgetMs = 48000,
 ): Promise<EventFeed> {
   const deadline = Date.now() + budgetMs;
@@ -47,6 +47,7 @@ export async function collectFeed(
       previous.mode === "live" &&
       previous.pipelineVersion === "news-v3" &&
       previous.coverage?.contextStatus === "complete" &&
+      previous.coverage.retentionDays >= retentionDays &&
       previous.events.every((item) => !!item.participants) &&
       Date.now() - Date.parse(date) < 3600000
     )
