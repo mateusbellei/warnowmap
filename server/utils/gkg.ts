@@ -5,6 +5,7 @@ import { regionFromCoordinates } from "../../shared/utils/events";
 import { parseGdeltDate } from "./gdelt";
 import { articleTopic } from "./news-topics";
 import { headlineCountries, countryReference } from "./headline-countries";
+import { cleanHeadline } from "./headline";
 
 export function pageHeadline(xml: string): string | undefined {
   const raw = /<PAGE_TITLE>([\s\S]*?)<\/PAGE_TITLE>/.exec(xml)?.[1];
@@ -85,8 +86,13 @@ export function articleContexts(text: string, events: ConflictEvent[]) {
       .split(";")
       .filter((theme) => /^[A-Z0-9_]{1,100}$/.test(theme));
     const previous = contexts.get(key);
+    const originalHeadline =
+      pageHeadline(row[26] ?? "") ?? previous?.originalHeadline;
     contexts.set(key, {
-      headline: pageHeadline(row[26] ?? "") ?? previous?.headline,
+      headline: originalHeadline
+        ? cleanHeadline(originalHeadline, key)
+        : previous?.headline,
+      originalHeadline,
       themes: [...new Set([...(previous?.themes ?? []), ...themes])].slice(
         0,
         500,
@@ -114,8 +120,9 @@ export function newsFromGkg(text: string, now = Date.now()): ConflictEvent[] {
     const row = line.split("\t");
     if (row.length < 27) continue;
     const sourceUrl = articleKey(row[4] ?? "");
-    const title = pageHeadline(row[26] ?? "");
-    if (!sourceUrl || !title || articles.has(sourceUrl)) continue;
+    const originalHeadline = pageHeadline(row[26] ?? "");
+    if (!sourceUrl || !originalHeadline || articles.has(sourceUrl)) continue;
+    const title = cleanHeadline(originalHeadline, sourceUrl);
     const themes = (row[7] ?? "")
       .split(";")
       .filter((theme) => /^[A-Z0-9_]{1,100}$/.test(theme))
@@ -156,7 +163,7 @@ export function newsFromGkg(text: string, now = Date.now()): ConflictEvent[] {
           : null,
       actors: [],
       participants: [],
-      articleContext: { themes, headline: title },
+      articleContext: { themes, headline: title, originalHeadline },
       kind: topic.kind,
       coordinates: anchor.coordinates,
       location: `${anchor.country.name} · referência de país na manchete`,
