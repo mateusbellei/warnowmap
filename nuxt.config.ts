@@ -7,6 +7,7 @@ export default defineNuxtConfig({
     "~/assets/css/map-first.css",
     "~/assets/css/economy.css",
     "~/assets/css/conflicts.css",
+    "~/assets/css/quality.css",
   ],
   typescript: { strict: true },
   runtimeConfig: { gdeltEnabled: true },

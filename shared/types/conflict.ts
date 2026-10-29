@@ -8,11 +8,32 @@ export const regions = [
 ] as const;
 export type Region = (typeof regions)[number];
 export type EventKind = "armed" | "violence" | "tension" | "diplomacy";
+export const actorRoleLabels: Record<string, string> = {
+  GOV: "Governo",
+  MIL: "Forças armadas",
+  REB: "Rebeldes",
+  INS: "Insurgentes",
+  SEP: "Separatistas",
+  UAF: "Grupo armado",
+  IGO: "Organização intergovernamental",
+  NGO: "Organização não governamental",
+};
 export interface CountryRef {
   code: string;
   name: string;
 }
 export interface ConflictEvent {
+  sourceType?: "article" | "extraction";
+  countryBasis?: "headline" | "actors";
+  dateBasis?: "publication" | "indexed" | "event";
+  participants?: {
+    name: string;
+    country: CountryRef | null;
+    roles: string[];
+  }[];
+  articleContext?: { themes: string[]; headline?: string };
+  locationPrecision?: "country" | "region" | "local";
+  selection?: { basis: "context" | "structured"; reasons: string[] };
   economy?: EconomicImpact;
   id: string;
   title: string;
@@ -40,6 +61,14 @@ export interface EconomicImpact {
   context: string;
 }
 export interface EventFeed {
+  pipelineVersion?: "news-v2";
+  quality?: {
+    policy: "conflict-v1";
+    evaluated: number;
+    selected: number;
+    rejected: number;
+    withContext: number;
+  };
   events: ConflictEvent[];
   mode: "live" | "stale" | "demo" | "unavailable";
   fetchedAt: string | null;

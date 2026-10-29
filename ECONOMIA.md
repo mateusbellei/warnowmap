@@ -1,5 +1,7 @@
 # Economia no mapa e na cronologia
 
+Após a revisão editorial, somente relatos que passam pela triagem de conflitos entram nesta camada. Nas notícias do GKG, uma manchete sobre sanções acompanhada do tema SANCTIONS produz um sinal temático, sem inventar código CAMEO ou perdas. A fonte pode tratar de proposta, imposição, alívio ou debate; o rótulo “Sanções mencionadas na manchete” não confirma execução. Notícias rotineiras de comércio e cooperação não são incluídas só para preencher indicadores. Ver `docs/QUALIDADE.md`.
+
 Economia é um atributo dos relatos, preservando sua categoria original e evitando contagem duplicada no mapa. A faixa de resumo acompanha país, relação, datas e cursor temporal. O botão Economia restringe mapa e cronologia aos relatos com esse atributo; `?economy=true` permite compartilhar o filtro. O filtro de área visível continua limitado à cronologia.
 
 Escopo enxuto: sanções, comércio, ajuda econômica e rotas/logística. A faixa mostra a quantidade de medidas relatadas e de ameaças/intenções; esses números contam relatos, não prejuízo, gravidade, medidas únicas ou países afetados. A localização permanece a do relato, não a área de propagação do impacto.

@@ -26,6 +26,7 @@ import {
 } from "@lucide/vue";
 import {
   regions,
+  actorRoleLabels,
   kindLabels,
   type EventKind,
   type EventFeed,
@@ -41,6 +42,7 @@ import {
 } from "#shared/utils/timeline";
 
 const route = useRoute();
+const roleLabel = (role: string) => actorRoleLabels[role] ?? "Outro papel";
 const router = useRouter();
 const demo = ref(route.query.demo === "true");
 const search = ref(
@@ -51,8 +53,8 @@ const country = ref(
   typeof route.query.country === "string" ? route.query.country : "",
 );
 const pair = ref(typeof route.query.pair === "string" ? route.query.pair : "");
-const interstateOnly = ref(true);
-const stateOnly = ref(true);
+const interstateOnly = ref(false);
+const stateOnly = ref(false);
 const kinds = ref<EventKind[]>(
   route.query.focus === "conflicts"
     ? ["armed", "violence"]
@@ -203,7 +205,7 @@ const relations = computed(() => {
         label: [...event.countries]
           .sort((a, b) => a.code.localeCompare(b.code))
           .map((c) => c.name)
-          .join(" ↔ "),
+          .join(" · "),
         count: 1,
       });
   }
@@ -284,8 +286,8 @@ function clearFilters() {
   region.value = "Todas as regiões";
   country.value = "";
   pair.value = "";
-  interstateOnly.value = true;
-  stateOnly.value = true;
+  interstateOnly.value = false;
+  stateOnly.value = false;
   kinds.value = ["armed", "violence", "tension", "diplomacy"];
   basis.value = "event";
   order.value = "desc";
@@ -496,10 +498,10 @@ onBeforeUnmount(() => {
           <article>
             <div class="stat-icon blue"><Globe2 :size="20" /></div>
             <div>
-              <span>Relações bilaterais</span
+              <span>Associações de países</span
               ><strong
                 >{{ counts.pairs.toString().padStart(2, "0")
-                }}<small>pares de países</small></strong
+                }}<small>países citados ou associados</small></strong
               >
             </div>
           </article>
@@ -509,7 +511,7 @@ onBeforeUnmount(() => {
           class="relation-strip"
           aria-label="Relações presentes no histórico"
         >
-          <span>EXPLORAR RELAÇÕES</span
+          <span>PAÍSES ASSOCIADOS</span
           ><button :class="{ active: !pair }" @click="pair = ''">Todas</button
           ><button
             v-for="relation in pairOptions"
@@ -546,11 +548,19 @@ onBeforeUnmount(() => {
             <div class="conflict-metrics">
               <div>
                 <strong>{{ loading ? "—" : counts.combat }}</strong
-                ><span>confrontos armados</span>
+                ><span>{{
+                  counts.combat === 1
+                    ? "relato de confronto"
+                    : "relatos de confronto"
+                }}</span>
               </div>
               <div>
                 <strong>{{ loading ? "—" : counts.violence }}</strong
-                ><span>relatos de violência</span>
+                ><span>{{
+                  counts.violence === 1
+                    ? "relato de violência"
+                    : "relatos de violência"
+                }}</span>
               </div>
             </div>
             <button
@@ -569,7 +579,8 @@ onBeforeUnmount(() => {
                 pairLabel || "Confrontos e diplomacia"
               }}</strong
               ><span class="toolbar-divider" /><span class="muted"
-                >{{ events.length }} relatos</span
+                >{{ events.length }}
+                {{ events.length === 1 ? "relato" : "relatos" }}</span
               >
             </div>
             <div class="toolbar-actions">
@@ -621,10 +632,30 @@ onBeforeUnmount(() => {
               }}</span></button
             ><span>{{
               interstateOnly
-                ? "Atores de países distintos; não equivale a guerra declarada."
-                : "Recorte ampliado: inclui relações domésticas e atores sem país identificado."
+                ? "Afiliações nacionais distintas; não identifica agressores ou alvos."
+                : "Inclui conflitos internos. Países são menções ou afiliações; não indicam agressor ou alvo."
             }}</span>
           </div>
+          <details v-if="feed?.quality" class="quality-summary">
+            <summary>
+              <SlidersHorizontal :size="13" /> Triagem de conflitos ·
+              {{ feed.quality.selected }}
+              {{
+                feed.quality.selected === 1
+                  ? "notícia selecionada"
+                  : "notícias selecionadas"
+              }}
+              no arquivo
+            </summary>
+            <p>
+              {{ feed.quality.rejected }} de
+              {{ feed.quality.evaluated }} extrações ficaram fora por falta de
+              sinais específicos. {{ feed.quality.withContext }} selecionados
+              têm contexto temático do mesmo artigo. Sem manchete e temas, novos
+              relatos ficam fora da seleção. A triagem não confirma fatos,
+              autoria de ataques ou a localização exata.
+            </p>
+          </details>
           <section
             class="economy-strip"
             aria-label="Principais sinais econômicos no recorte"
@@ -698,7 +729,7 @@ onBeforeUnmount(() => {
             ><label class="military-filter"
               ><input v-model="stateOnly" type="checkbox" /> Com vínculo estatal
               identificado<small
-                >Governo, forças armadas, elite ou código nacional</small
+                >Papel explícito de governo ou forças armadas</small
               ></label
             ><button class="text-button" @click="clearFilters">
               Limpar filtros
@@ -792,7 +823,8 @@ onBeforeUnmount(() => {
                 <span>•</span> WGS 84
               </div>
               <div class="map-reading-note">
-                Anéis: categorias · número: relatos · contorno dourado: economia
+                Anéis: categorias · número: notícias · pontos são referências,
+                não posições de ataques · dourado: economia
               </div>
               <div class="map-legend">
                 <span><i class="armed" />Confronto</span
@@ -818,12 +850,52 @@ onBeforeUnmount(() => {
                     <X :size="17" />
                   </button>
                 </div>
-                <div v-if="active.countryPair" class="country-relation">
-                  <span>{{ active.countries[0]?.name }}</span
-                  ><span class="relation-link">↔</span
-                  ><span>{{ active.countries[1]?.name }}</span>
+                <div v-if="active.countries.length" class="country-relation">
+                  <small class="affiliation-label">{{
+                    active.countryBasis === "headline"
+                      ? "Países citados na manchete"
+                      : "Afiliações dos atores indexados"
+                  }}</small>
+                  <template
+                    v-for="(country, index) in active.countries"
+                    :key="country.code"
+                    ><span v-if="index" class="relation-link">·</span
+                    ><span>{{ country.name }}</span></template
+                  >
                 </div>
                 <h2>{{ active.title }}</h2>
+                <p v-if="!active.demo" class="classification-note">
+                  Manchete indexada da fonte · classificação automática
+                  apresentada separadamente.
+                  <span v-if="active.dateBasis === 'indexed'"
+                    >Publicação não informada; a data indica indexação, não o
+                    momento do fato.</span
+                  >
+                </p>
+                <a
+                  v-if="!active.demo"
+                  :href="active.sourceUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Ler fonte original <ExternalLink :size="14"
+                /></a>
+                <section
+                  v-if="active.selection"
+                  class="selection-context"
+                  aria-label="Por que este relato entrou"
+                >
+                  <strong>{{
+                    active.selection.basis === "context"
+                      ? "Contexto de conflito identificado"
+                      : "Contexto temático indisponível"
+                  }}</strong>
+                  <p v-for="reason in active.selection.reasons" :key="reason">
+                    {{ reason }}
+                  </p>
+                  <small
+                    >Triagem automática · não é verificação editorial.</small
+                  >
+                </section>
                 <section
                   v-if="active.economy"
                   class="economic-context"
@@ -854,14 +926,26 @@ onBeforeUnmount(() => {
                 </section>
                 <p>
                   {{
-                    active.actors.length
-                      ? active.actors.join(" · ")
-                      : "Acontecimento ilustrativo, sem validade factual."
+                    active.sourceType === "article"
+                      ? "Países extraídos da manchete. A notícia não recebe atribuição automática de agressor ou alvo."
+                      : active.demo
+                        ? "Acontecimento ilustrativo, sem validade factual."
+                        : active.actors.length
+                          ? active.actors.join(" · ")
+                          : "Atores não identificados no registro."
                   }}
                 </p>
                 <dl>
                   <div>
-                    <dt>Data do fato</dt>
+                    <dt>
+                      {{
+                        active.dateBasis === "publication"
+                          ? "Publicação da fonte"
+                          : active.dateBasis === "indexed"
+                            ? "Indexação da notícia"
+                            : "Data atribuída ao fato"
+                      }}
+                    </dt>
                     <dd>{{ formatDate(active.eventDate) }}</dd>
                   </div>
                   <div>
@@ -869,12 +953,30 @@ onBeforeUnmount(() => {
                     <dd>{{ formatDate(active.reportedAt, true) }}</dd>
                   </div>
                   <div>
-                    <dt>Local aproximado</dt>
-                    <dd>{{ active.location }}</dd>
+                    <dt>Referência geográfica no texto</dt>
+                    <dd>
+                      {{ active.location
+                      }}<small v-if="active.locationPrecision === 'country'"
+                        >Somente referência ao país; não localiza o
+                        confronto.</small
+                      >
+                    </dd>
                   </div>
                   <div>
-                    <dt>Classificação CAMEO</dt>
-                    <dd>{{ active.actionCode }}</dd>
+                    <dt>
+                      {{
+                        active.sourceType === "article"
+                          ? "Origem da classificação"
+                          : "Classificação CAMEO"
+                      }}
+                    </dt>
+                    <dd>
+                      {{
+                        active.sourceType === "article"
+                          ? "Manchete e temas do mesmo artigo"
+                          : active.actionCode
+                      }}
+                    </dd>
                   </div>
                   <div>
                     <dt>Revisão editorial</dt>
@@ -883,15 +985,26 @@ onBeforeUnmount(() => {
                     </dd>
                   </div>
                 </dl>
-                <a
-                  v-if="!active.demo"
-                  :href="active.sourceUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  >Ler fonte original <ExternalLink :size="14" /></a
-                ><small
-                  >Países indicam afiliação dos atores, não confirmação de ação
-                  estatal. Local aproximado.</small
+                <div
+                  v-if="active.participants?.length"
+                  class="participant-list"
+                >
+                  <strong>Atores indexados na fonte</strong>
+                  <p v-for="(actor, index) in active.participants" :key="index">
+                    {{ actor.name }}
+                    <small
+                      >{{ actor.country?.name ?? "País não identificado" }} ·
+                      {{
+                        actor.roles.length
+                          ? actor.roles.map(roleLabel).join(", ")
+                          : "Sem papel identificado"
+                      }}</small
+                    >
+                  </p>
+                </div>
+                <small
+                  >Menções e afiliações nacionais não identificam agressores ou
+                  alvos. Ponto de referência geográfica.</small
                 >
               </section>
             </div>
@@ -910,7 +1023,7 @@ onBeforeUnmount(() => {
                 }}</strong
                 ><span>{{
                   basis === "event"
-                    ? "Data do acontecimento"
+                    ? "Data da notícia ou relato"
                     : "Data de entrada no feed"
                 }}</span>
               </div>
@@ -930,7 +1043,7 @@ onBeforeUnmount(() => {
                     v-model="basis"
                     aria-label="Base temporal"
                   >
-                    <option value="event">Data do fato</option>
+                    <option value="event">Data da notícia / relato</option>
                     <option value="collected">Entrada no feed</option>
                   </select></label
                 >
@@ -978,8 +1091,9 @@ onBeforeUnmount(() => {
                 <div class="time-axis-labels">
                   <span>{{ shortDay(from) }}</span
                   ><span
-                    >{{ cutoff ? shortDay(cutoff) : "" }} ·
-                    {{ events.length }} relatos até esta data</span
+                    >{{ cutoff ? shortDay(cutoff) : "" }} · {{ events.length }}
+                    {{ events.length === 1 ? "relato" : "relatos" }} até esta
+                    data</span
                   ><span>{{ shortDay(to) }}</span>
                 </div>
               </div>
@@ -1096,26 +1210,35 @@ onBeforeUnmount(() => {
       <div class="eyebrow">FONTES E METODOLOGIA</div>
       <h2 id="about-title">Confronto e diálogo,<br />com contexto temporal.</h2>
       <p>
-        O GDELT 2.0 extrai ações e atores de notícias. Exibimos confrontos,
-        coerção e categorias de consultas, cooperação, ajuda e concessões. A
-        classificação diplomática pode incluir propostas e gestos; não confirma
-        um acordo ou cessar-fogo.
+        Selecionamos manchetes de notícias com temas específicos no GKG. Os
+        países citados na manchete são identificados por nomes e sinônimos
+        explícitos; a posição é uma referência de país do próprio GKG, não o
+        local exato do fato. Quando há uma extração de ação, também exigimos
+        papéis e países coerentes com a manchete. Diplomacia rotineira, crimes
+        comuns sem sinais de conflito e códigos genéricos não entram apenas por
+        citar dois países. Sem manchete e contexto temático, novos relatos ficam
+        fora da seleção. A triagem pode perder relatos relevantes e ainda conter
+        erros; não é revisão editorial.
       </p>
       <h3>Países e relações</h3>
       <p>
-        Os países vêm de Actor1CountryCode e Actor2CountryCode, não do local da
-        notícia. O recorte bilateral exige dois códigos nacionais distintos
-        reconhecidos. Afiliação nacional não prova envolvimento de governos ou
-        guerra declarada. O filtro de vínculo estatal é uma heurística adicional
-        de cargos e códigos dos atores.
+        Nas notícias, países são menções na manchete; nas extrações de ação, são
+        afiliações indexadas dos atores. O recorte bilateral exige dois países
+        reconhecidos. Menção ou afiliação não prova envolvimento de governos ou
+        guerra declarada. Cidades, capitais, nacionalidades e códigos nacionais
+        isolados não comprovam ação estatal. O filtro estatal exige papel
+        explícito de governo ou forças armadas. O padrão inclui conflitos
+        internos e grupos armados.
       </p>
       <h3>Como ler a linha do tempo</h3>
       <p>
-        A data atribuída ao fato tem precisão de um dia; não inventamos
-        horários. A entrada no feed tem horário UTC e pode ocorrer muito depois.
-        Troque a base temporal para investigar essa diferença. O cursor mostra
-        os relatos entre o início do período e o dia selecionado; a reprodução
-        avança por dia e não mostra movimentos militares.
+        Nas notícias, a data é a publicação quando informada; caso contrário, é
+        a indexação, identificada explicitamente. Nas extrações, é a data
+        atribuída ao fato, com precisão diária. A entrada no feed tem horário
+        UTC e pode ocorrer depois. Troque a base temporal para investigar essa
+        diferença. O cursor mostra os relatos entre o início do período e o dia
+        selecionado; a reprodução avança por dia e não mostra movimentos
+        militares.
       </p>
       <h3>Cobertura e limitações</h3>
       <p>
@@ -1126,10 +1249,10 @@ onBeforeUnmount(() => {
         acontecimentos.
       </p>
       <p>
-        Fontes, coordenadas e categorias podem conter erros. Agrupamos o mesmo
-        artigo, local, data, categoria, ação e par de países. Não deduplicamos
-        fatos entre veículos. O modo demonstração contém apenas cenários
-        ilustrativos.
+        Fontes, coordenadas e categorias podem conter erros. Exibimos uma
+        entrada por URL e priorizamos a notícia com países da manchete. Não
+        deduplicamos fatos entre veículos. O modo demonstração contém apenas
+        cenários ilustrativos.
       </p>
       <div class="about-links">
         <a

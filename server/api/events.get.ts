@@ -9,11 +9,15 @@ import {
 import { mergeHistory } from "../../shared/utils/timeline";
 import { actorCountry } from "../utils/countries";
 import { economicImpact } from "../../shared/utils/economy";
+import { explicitStateLink, selectEditorial } from "../utils/editorial";
+import { decodeGkg, enrichContext, newsFromGkg } from "../utils/gkg";
 
 function normalizeCountryNames(feed: EventFeed | null) {
   if (feed)
     for (const event of feed.events) {
-      event.economy = economicImpact(event.actionCode);
+      if (event.sourceType !== "article")
+        event.economy = economicImpact(event.actionCode);
+      event.stateLinked = explicitStateLink(event);
       event.countries = event.countries.map(
         (country) => actorCountry(country.code) ?? country,
       );
@@ -37,11 +41,13 @@ async function loadFeed(): Promise<EventFeed> {
     date = new Date(date).toISOString();
     stage = "read-history";
     const previous = normalizeCountryNames(
-      await storage.getItem<EventFeed>("events:v3:last"),
+      await storage.getItem<EventFeed>("events:v4:last"),
     );
     if (
       previous?.datasetAt === date &&
       previous.mode === "live" &&
+      previous.pipelineVersion === "news-v2" &&
+      previous.events.every((item) => !!item.participants) &&
       Date.now() - Date.parse(date) < 3600000
     )
       return previous;
@@ -78,17 +84,37 @@ async function loadFeed(): Promise<EventFeed> {
       )
       .sort();
     stage = "decode";
+    let incoming = parseGdeltExport(decodeExport(new Uint8Array(archive)));
+    // Apenas o GKG do lote realmente obtido, em host fixo. Falha não abre a triagem geral.
+    if (incoming.length)
+      try {
+        const gkgUrl = exportCandidates(date)[0]!.url.replace(
+          ".export.CSV.zip",
+          ".gkg.csv.zip",
+        );
+        const gkg = await $fetch<ArrayBuffer>(gkgUrl, {
+          timeout: 6000,
+          retry: 0,
+          responseType: "arrayBuffer",
+        });
+        const contextText = decodeGkg(new Uint8Array(gkg));
+        incoming = [
+          ...enrichContext(incoming, contextText),
+          ...newsFromGkg(contextText),
+        ];
+      } catch {
+        console.warn(
+          "GDELT: contexto GKG indisponível; novos relatos sem contexto ficam fora da seleção",
+        );
+      }
     const feed: EventFeed = {
-      events: mergeHistory(
-        previous?.events ?? [],
-        parseGdeltExport(decodeExport(new Uint8Array(archive))),
-        Date.now(),
-      ),
+      pipelineVersion: "news-v2",
+      events: mergeHistory(previous?.events ?? [], incoming, Date.now()),
       mode: Date.now() - Date.parse(date) > 3600000 ? "stale" : "live",
       fetchedAt: new Date().toISOString(),
       datasetAt: date,
       message:
-        "Relatos automáticos de confrontos e diplomacia. Histórico acumulado das coletas, com retenção de sete dias; não representa cobertura completa. Localizações aproximadas; sem revisão editorial.",
+        "Notícias selecionadas por manchete, temas e evidências estruturadas. Histórico acumulado das coletas, com retenção de sete dias; não representa cobertura completa. Pontos de referência geográfica; sem revisão editorial.",
       provider: "GDELT 2.0",
       coverage: {
         firstCollectedAt: new Date(
@@ -106,7 +132,7 @@ async function loadFeed(): Promise<EventFeed> {
       },
     };
     stage = "persist";
-    await storage.setItem("events:v3:last", feed);
+    await storage.setItem("events:v4:last", feed);
     return feed;
   } catch (error) {
     const diagnostic = error as {
@@ -122,7 +148,7 @@ async function loadFeed(): Promise<EventFeed> {
       status: diagnostic?.statusCode,
     });
     const previous = normalizeCountryNames(
-      await storage.getItem<EventFeed>("events:v3:last").catch(() => null),
+      await storage.getItem<EventFeed>("events:v4:last").catch(() => null),
     );
     if (previous)
       return {
@@ -146,24 +172,31 @@ async function loadFeed(): Promise<EventFeed> {
 export default defineEventHandler(async (event): Promise<EventFeed> => {
   setHeader(event, "Cache-Control", "no-store");
   const scope = getQuery(event).scope;
-  const present = (feed: EventFeed): EventFeed => ({
-    ...feed,
-    ...(feed.coverage
-      ? {
-          coverage: {
-            ...feed.coverage,
-            persistence: process.env.VERCEL ? "ephemeral" : "persistent",
-          },
-        }
-      : {}),
-    events:
-      scope === "bilateral" || scope === "state"
-        ? feed.events.filter(
-            (item) =>
-              !!item.countryPair && (scope !== "state" || item.stateLinked),
-          )
-        : feed.events,
-  });
+  const present = (feed: EventFeed): EventFeed => {
+    const selection =
+      feed.mode === "demo"
+        ? { events: feed.events, quality: undefined }
+        : selectEditorial(feed.events);
+    return {
+      ...feed,
+      quality: selection.quality,
+      ...(feed.coverage
+        ? {
+            coverage: {
+              ...feed.coverage,
+              persistence: process.env.VERCEL ? "ephemeral" : "persistent",
+            },
+          }
+        : {}),
+      events:
+        scope === "bilateral" || scope === "state"
+          ? selection.events.filter(
+              (item) =>
+                !!item.countryPair && (scope !== "state" || item.stateLinked),
+            )
+          : selection.events,
+    };
+  };
   const config = useRuntimeConfig(event);
   if (
     getQuery(event).demo === "true" ||

@@ -45,12 +45,15 @@ const timeLabel = (date: string) =>
         <Radio :size="17" />
         <h2>Linha do tempo</h2>
       </div>
-      <span>{{ events.length }} relatos</span>
+      <span
+        >{{ events.length }}
+        {{ events.length === 1 ? "relato" : "relatos" }}</span
+      >
     </header>
     <p class="chronology-note">
       <Clock3 :size="12" />{{
         basis === "event"
-          ? "Data atribuída ao fato · horário não informado"
+          ? "Data de referência · publicação ou extração do fato"
           : "Entrada no feed · horário em UTC"
       }}
     </p>
@@ -97,15 +100,32 @@ const timeLabel = (date: string) =>
                     ? "DEMO"
                     : basis === "collected"
                       ? `${timeLabel(event.reportedAt)} UTC`
-                      : "Data do fato"
+                      : event.dateBasis === "publication"
+                        ? "Publicação"
+                        : event.dateBasis === "indexed"
+                          ? "Indexação"
+                          : "Data atribuída"
                 }}</span>
               </div>
-              <div v-if="event.countryPair" class="country-relation">
-                <span>{{ event.countries[0]?.name }}</span
-                ><span class="relation-link">↔</span
-                ><span>{{ event.countries[1]?.name }}</span>
+              <div v-if="event.countries.length" class="country-relation">
+                <small class="affiliation-label">{{
+                  event.countryBasis === "headline"
+                    ? "Países citados na manchete"
+                    : "Afiliações dos atores indexados"
+                }}</small>
+                <template
+                  v-for="(country, index) in event.countries"
+                  :key="country.code"
+                  ><span v-if="index" class="relation-link">·</span
+                  ><span>{{ country.name }}</span></template
+                >
               </div>
               <h4>{{ event.title }}</h4>
+              <span v-if="event.selection" class="selection-badge">{{
+                event.selection.basis === "context"
+                  ? "Triagem com contexto do artigo"
+                  : "Sinal militar · contexto limitado"
+              }}</span>
               <div v-if="event.economy" class="timeline-economy">
                 <span class="economy-badge"
                   >$
