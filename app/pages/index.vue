@@ -229,12 +229,14 @@ const counts = computed(() => ({
 const modeLabel = computed(() =>
   !feed.value
     ? "Aguardando coleta"
-    : {
-        live: "Feed conectado",
-        stale: "Dados desatualizados",
-        demo: "Demonstração",
-        unavailable: "Feed indisponível",
-      }[feed.value?.mode ?? "unavailable"],
+    : feed.value.coverage?.contextStatus === "partial"
+      ? "Coleta incompleta"
+      : {
+          live: "Feed conectado",
+          stale: "Dados desatualizados",
+          demo: "Demonstração",
+          unavailable: "Feed indisponível",
+        }[feed.value?.mode ?? "unavailable"],
 );
 function formatDate(value: string, time = false) {
   return (
@@ -737,7 +739,12 @@ onBeforeUnmount(() => {
           </div>
 
           <div
-            v-if="error || (feed && feed.mode !== 'live')"
+            v-if="
+              error ||
+              (feed &&
+                (feed.mode !== 'live' ||
+                  feed.coverage?.contextStatus === 'partial'))
+            "
             class="feed-status-banner"
             :class="feed?.mode"
             role="status"

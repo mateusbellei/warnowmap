@@ -30,6 +30,7 @@ let pending: Promise<EventFeed> | undefined;
 let cached: { expires: number; feed: EventFeed } | undefined;
 
 async function loadFeed(): Promise<EventFeed> {
+  const deadline = Date.now() + 48000;
   const storage = useStorage("data");
   let stage = "manifest";
   try {
@@ -46,7 +47,8 @@ async function loadFeed(): Promise<EventFeed> {
     if (
       previous?.datasetAt === date &&
       previous.mode === "live" &&
-      previous.pipelineVersion === "news-v2" &&
+      previous.pipelineVersion === "news-v3" &&
+      previous.coverage?.contextStatus === "complete" &&
       previous.events.every((item) => !!item.participants) &&
       Date.now() - Date.parse(date) < 3600000
     )
@@ -85,36 +87,69 @@ async function loadFeed(): Promise<EventFeed> {
       .sort();
     stage = "decode";
     let incoming = parseGdeltExport(decodeExport(new Uint8Array(archive)));
-    // Apenas o GKG do lote realmente obtido, em host fixo. Falha não abre a triagem geral.
-    if (incoming.length)
-      try {
-        const gkgUrl = exportCandidates(date)[0]!.url.replace(
-          ".export.CSV.zip",
-          ".gkg.csv.zip",
-        );
-        const gkg = await $fetch<ArrayBuffer>(gkgUrl, {
-          timeout: 6000,
-          retry: 0,
-          responseType: "arrayBuffer",
-        });
-        const contextText = decodeGkg(new Uint8Array(gkg));
-        incoming = [
-          ...enrichContext(incoming, contextText),
-          ...newsFromGkg(contextText),
-        ];
-      } catch {
-        console.warn(
-          "GDELT: contexto GKG indisponível; novos relatos sem contexto ficam fora da seleção",
-        );
-      }
+    // GKG é uma fonte de notícias independente do número de extrações CAMEO.
+    // Uma instância nova recupera até duas horas; duas transferências por vez.
+    const completed = new Set(previous?.coverage?.contextBatchDates ?? []);
+    const candidates = exportCandidates(date).slice(0, 8);
+    const missing = candidates.filter((item) => !completed.has(item.date));
+    for (let offset = 0; offset < missing.length; offset += 2) {
+      if (Date.now() >= deadline) break;
+      await Promise.all(
+        missing.slice(offset, offset + 2).map(async (candidate) => {
+          try {
+            const gkg = await $fetch<ArrayBuffer>(
+              candidate.url.replace(".export.CSV.zip", ".gkg.csv.zip"),
+              {
+                timeout: Math.min(6000, Math.max(1, deadline - Date.now())),
+                retry: 0,
+                responseType: "arrayBuffer",
+              },
+            );
+            const text = decodeGkg(new Uint8Array(gkg));
+            if (candidate.date === date)
+              incoming = enrichContext(incoming, text);
+            incoming.push(...newsFromGkg(text));
+            completed.add(candidate.date);
+          } catch (error) {
+            const diagnostic = error as {
+              name?: string;
+              statusCode?: number;
+              message?: string;
+            };
+            console.warn("GDELT: falha de contexto", {
+              batch: candidate.date,
+              name: diagnostic.name,
+              status: diagnostic.statusCode,
+              reason: diagnostic.message?.slice(0, 180),
+            });
+          }
+        }),
+      );
+    }
+    const contextDates = [...completed]
+      .filter((value) => Date.parse(value) >= Date.now() - 7 * 86400000)
+      .sort();
+    const incomplete = candidates.some((item) => !completed.has(item.date));
+    const collectedDates = [
+      ...new Set([...batchDates, ...contextDates]),
+    ].sort();
+    const currentContext = completed.has(date);
+    const merged = mergeHistory(previous?.events ?? [], incoming, Date.now());
     const feed: EventFeed = {
-      pipelineVersion: "news-v2",
-      events: mergeHistory(previous?.events ?? [], incoming, Date.now()),
-      mode: Date.now() - Date.parse(date) > 3600000 ? "stale" : "live",
+      pipelineVersion: "news-v3",
+      events: merged,
+      mode: !currentContext
+        ? selectEditorial(merged).events.length
+          ? "stale"
+          : "unavailable"
+        : Date.now() - Date.parse(date) > 3600000
+          ? "stale"
+          : "live",
       fetchedAt: new Date().toISOString(),
       datasetAt: date,
-      message:
-        "Notícias selecionadas por manchete, temas e evidências estruturadas. Histórico acumulado das coletas, com retenção de sete dias; não representa cobertura completa. Pontos de referência geográfica; sem revisão editorial.",
+      message: incomplete
+        ? "Coleta de contexto incompleta. Exibindo apenas notícias com contexto disponível; novas tentativas automáticas em um minuto. Poucos relatos não significam ausência de conflitos."
+        : "Notícias selecionadas por manchete, temas e evidências estruturadas. Janela inicial de até duas horas, com histórico das coletas retido por sete dias; cobertura parcial, sem revisão editorial.",
       provider: "GDELT 2.0",
       coverage: {
         firstCollectedAt: new Date(
@@ -126,9 +161,11 @@ async function loadFeed(): Promise<EventFeed> {
           ),
         ).toISOString(),
         lastCollectedAt: new Date().toISOString(),
-        batches: batchDates.length,
+        batches: collectedDates.length,
         retentionDays: 7,
-        batchDates,
+        batchDates: collectedDates,
+        contextBatchDates: contextDates,
+        contextStatus: incomplete ? "partial" : "complete",
       },
     };
     stage = "persist";
@@ -217,7 +254,12 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
     .then((feed) => {
       cached = {
         feed,
-        expires: Date.now() + (feed.mode === "unavailable" ? 60000 : 300000),
+        expires:
+          Date.now() +
+          (feed.mode === "unavailable" ||
+          feed.coverage?.contextStatus === "partial"
+            ? 60000
+            : 300000),
       };
       return feed;
     })

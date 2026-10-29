@@ -14,7 +14,9 @@ export function articleTopic(
   if (
     /\b(obituar\w*|dies at|died aged|morre aos|fallece a los|remembering|on this day|a look back|retrospectiv\w*)\b/.test(
       text,
-    )
+    ) ||
+    (/\b(midterms?|elections?|eleico\w*|votac\w*)\b/.test(text) &&
+      /(?:hoping for|hope for|predict\w*|esper\w*).{0,35}massacre/.test(text))
   )
     return null;
   const conflict = themes.some((theme) =>
@@ -48,7 +50,7 @@ export function articleTopic(
     };
   if (
     military &&
-    /threat\w*|ameac\w*|amenaz\w*|missile launch|missile test|military (exercise|drill)|naval (exercise|drill)|nuclear.{0,18}(weapon|program|talk|deal|dispute|crisis)|(?:weapon|arma|programa).{0,18}nuclear|lancamento.{0,25}miss|teste.{0,25}miss|deployment|troops deployed/.test(
+    /(?:threat\w*|ameac\w*|amenaz\w*).{0,60}(?:strike|attack|war\b|nuclear|militar|missile|invasion|ataque|guerra)|(?:strike|attack|nuclear|militar|missile|invasion|ataque|guerra).{0,60}(?:threat\w*|ameac\w*|amenaz\w*)|missile launch|missile test|military (exercise|drill|deployment)|naval (exercise|drill|deployment)|nuclear.{0,18}(weapon|program|talk|deal|dispute|crisis)|(?:weapon|arma|programa).{0,18}nuclear|lancamento.{0,25}miss|teste.{0,25}miss|troops deployed/.test(
       text,
     )
   )

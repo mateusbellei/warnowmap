@@ -22,6 +22,7 @@ beforeEach(() => {
   stored = null;
   query = {};
   fetchMock.mockReset();
+  fetchMock.mockResolvedValue(zipSync({ "empty.gkg.csv": strToU8("") }).buffer);
   storage.setItem.mockClear();
   vi.stubGlobal("defineEventHandler", (handler: unknown) => handler);
   vi.stubGlobal("setHeader", vi.fn());
@@ -31,6 +32,7 @@ beforeEach(() => {
   vi.stubGlobal("$fetch", fetchMock);
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -39,7 +41,93 @@ async function handler() {
     event: object,
   ) => Promise<EventFeed>;
 }
+function newsArchive(date: string) {
+  const row = Array(27).fill("");
+  Object.assign(row, {
+    0: `${date}-1`,
+    1: date,
+    4: `https://example.org/${date}`,
+    7: "ARMEDCONFLICT;MILITARY;",
+    9: "1#Ukraine#UP#UP#49#32#UP",
+    26: "<PAGE_TITLE>Russian drones attack Ukraine in renewed offensive</PAGE_TITLE>",
+  });
+  return zipSync({ [`${date}.gkg.csv`]: strToU8(row.join("\t")) }).buffer;
+}
 describe("API de relatos", () => {
+  it("recupera notícias de oito lotes mesmo sem extrações CAMEO e evita refazer o contexto concluído", async () => {
+    const date = stamp();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("lastupdate.txt"))
+        return `100 hash http://data.gdeltproject.org/gdeltv2/${date}.export.CSV.zip`;
+      if (url.endsWith(".export.CSV.zip"))
+        return zipSync({ "empty.export.CSV": strToU8("") }).buffer;
+      const batch = /\/(\d{14})\.gkg/.exec(url)![1]!;
+      return newsArchive(batch);
+    });
+    const api = await handler();
+    const response = await api({});
+    expect(response.events).toHaveLength(8);
+    expect(response.coverage?.contextBatchDates).toHaveLength(8);
+    expect(response.coverage?.contextStatus).toBe("complete");
+    expect(
+      response.events.every((event) => event.sourceType === "article"),
+    ).toBe(true);
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 301000);
+    await api({});
+    expect(fetchMock).toHaveBeenCalledTimes(11); // Só o manifesto adicional.
+    vi.restoreAllMocks();
+  });
+  it("não trata falha de contexto como feed conectado e tenta novamente no mesmo lote após um minuto", async () => {
+    const date = stamp();
+    let available = false;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("lastupdate.txt"))
+        return `100 hash http://data.gdeltproject.org/gdeltv2/${date}.export.CSV.zip`;
+      if (url.endsWith(".export.CSV.zip"))
+        return zipSync({ "empty.export.CSV": strToU8("") }).buffer;
+      if (!available)
+        throw Object.assign(new Error("Arquivo ainda não publicado"), {
+          statusCode: 404,
+        });
+      return newsArchive(/\/(\d{14})\.gkg/.exec(url)![1]!);
+    });
+    const api = await handler();
+    const failed = await api({});
+    expect(failed.mode).toBe("unavailable");
+    expect(failed.coverage?.contextStatus).toBe("partial");
+    expect(failed.events).toEqual([]);
+    available = true;
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61000);
+    const recovered = await api({});
+    expect(recovered.datasetAt).toBe(failed.datasetAt);
+    expect(recovered.mode).toBe("live");
+    expect(recovered.events).toHaveLength(8);
+    expect(recovered.coverage?.contextStatus).toBe("complete");
+    vi.restoreAllMocks();
+  });
+  it("preserva notícias disponíveis quando o contexto mais recente falha e recupera apenas os lotes pendentes", async () => {
+    const date = stamp();
+    let currentAvailable = false;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("lastupdate.txt"))
+        return `100 hash http://data.gdeltproject.org/gdeltv2/${date}.export.CSV.zip`;
+      if (url.endsWith(".export.CSV.zip"))
+        return zipSync({ "empty.export.CSV": strToU8("") }).buffer;
+      const batch = /\/(\d{14})\.gkg/.exec(url)![1]!;
+      if (batch === date && !currentAvailable) throw new Error("timeout");
+      return newsArchive(batch);
+    });
+    const api = await handler();
+    const partial = await api({});
+    expect(partial.mode).toBe("stale");
+    expect(partial.events).toHaveLength(7);
+    currentAvailable = true;
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61000);
+    const recovered = await api({});
+    expect(recovered.events).toHaveLength(8);
+    expect(fetchMock).toHaveBeenCalledTimes(13); // Manifesto, exportação e único GKG pendente.
+    vi.restoreAllMocks();
+  });
   it("cruza o GKG do lote, prioriza a notícia e não publica a associação incidental dos atores", async () => {
     const date = stamp();
     const fields = Array(61).fill("");
@@ -217,10 +305,10 @@ describe("API de relatos", () => {
     expect(a.mode).toBe("live");
     expect(a).toEqual(b);
     expect(a.events).toEqual([]);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(10);
     expect(storage.setItem).toHaveBeenCalledOnce();
     await api({});
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(10);
   });
   it("sinaliza arquivo antigo como desatualizado", async () => {
     fetchMock
@@ -262,7 +350,7 @@ describe("API de relatos", () => {
     expect(result.events).toHaveLength(0);
     expect(result.quality?.rejected).toBe(1);
     expect(stored?.events).toHaveLength(1);
-    expect(result.coverage?.batches).toBe(2);
+    expect(result.coverage?.batches).toBe(9);
     expect(result.coverage?.firstCollectedAt).toBe(previousTime);
     expect(Date.parse(result.coverage!.lastCollectedAt)).toBeGreaterThanOrEqual(
       Date.parse(currentTime),
