@@ -12,6 +12,14 @@ export function articleTopic(
 ): { kind: EventKind; reason: string } | null {
   const text = normalizeText(headline);
   if (
+    /election|coalition|government formation|hang onto power|eleic\w*|coligac\w*/.test(
+      text,
+    ) &&
+    /negotiat|talks|negociac/.test(text) &&
+    !/peace talks|ceasefire|truce|hostage|nuclear|cessar.fogo/.test(text)
+  )
+    return null;
+  if (
     /\b(obituar\w*|dies at|died aged|morre aos|fallece a los|remembering|on this day|a look back|retrospectiv\w*)\b/.test(
       text,
     ) ||
