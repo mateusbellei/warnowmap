@@ -21,7 +21,22 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
         : groupOccurrences(selection.events);
     return {
       ...feed,
-      quality: selection.quality,
+      pipelineVersion: "monitor-v1",
+      quality:
+        feed.mode === "demo"
+          ? undefined
+          : {
+              ...selection.quality!,
+              evaluated: Math.max(
+                feed.quality?.evaluated ?? 0,
+                selection.quality!.evaluated,
+              ),
+              rejected:
+                Math.max(
+                  feed.quality?.evaluated ?? 0,
+                  selection.quality!.evaluated,
+                ) - selection.events.length,
+            },
       summary: {
         reports: selection.events.length,
         occurrences: occurrences.length,
@@ -73,9 +88,19 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
         "Cenários ilustrativos para explorar a interface. Não representam incidentes ou a situação atual.",
     });
   }
-  const repository = await configuredRepository();
+  const repository = await configuredRepository().catch(() => {
+    throw createError({
+      statusCode: 503,
+      statusMessage: "Persistent repository unavailable",
+    });
+  });
   if (repository) {
-    const stored = await repository.load();
+    const stored = await repository.load().catch(() => {
+      throw createError({
+        statusCode: 503,
+        statusMessage: "Persistent repository unavailable",
+      });
+    });
     if (!stored)
       return present({
         events: [],
@@ -86,7 +111,7 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
         message:
           "Aguardando a primeira coleta programada. O histórico persistente está configurado.",
         operation: {
-          ingestion: "scheduled",
+          ingestion: "external",
           repository: repository.kind,
           lastSuccessAt: null,
         },
@@ -97,9 +122,9 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
       ...stored,
       mode: stale ? "stale" : stored.mode,
       operation: {
-        ingestion: "scheduled",
+        ingestion: "external",
         repository: repository.kind,
-        lastSuccessAt: stored.fetchedAt,
+        lastSuccessAt: stored.operation?.lastSuccessAt ?? null,
       },
       coverage: stored.coverage
         ? { ...stored.coverage, persistence: "persistent" }

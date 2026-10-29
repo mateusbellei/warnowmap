@@ -3,6 +3,7 @@ import { demoEvents } from "../server/data/demo";
 import {
   canonicalArticleUrl,
   groupOccurrences,
+  classifyNarrative,
 } from "../shared/utils/occurrences";
 const event = {
   ...demoEvents[0]!,
@@ -13,6 +14,27 @@ const event = {
   eventDate: "2026-10-29",
 };
 describe("agrupamento conservador", () => {
+  it("distingue contestação, nível de alerta e análise sem converter declarações em confirmações", () => {
+    expect(
+      classifyNarrative({
+        ...event,
+        title: "Serbia raises terror threat to highest level",
+      }).situation,
+    ).toBe("announced");
+    expect(
+      classifyNarrative({ ...event, title: "Iran denies new peace agreement" })
+        .situation,
+    ).toBe("contested");
+    expect(
+      classifyNarrative({
+        ...event,
+        title: "Austin Bay's On PointThe Short, Curious Ceasefire",
+      }).contentType,
+    ).toBe("analysis");
+    expect(
+      classifyNarrative({ ...event, title: "Ukraine truce holds" }).situation,
+    ).toBe("reported");
+  });
   it("remove rastreamento mas preserva identificadores de matérias e atualizações que não sejam liveblogs", () => {
     expect(
       canonicalArticleUrl("https://example.org/story?id=1&utm_source=x#top"),

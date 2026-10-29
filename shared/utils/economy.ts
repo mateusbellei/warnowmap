@@ -1,7 +1,7 @@
 import type { EconomicImpact, ConflictEvent } from "../types/conflict";
 
 export const economicStageLabels = {
-  measure: "Medida relatada",
+  measure: "Medida mencionada",
   disruption: "Interrupção relatada",
   effect: "Efeito descrito pela fonte",
   risk: "Risco / intenção",
@@ -16,7 +16,7 @@ export function headlineEconomicSignal(
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   const potential =
-    /\b(may|could|risk\w*|threat\w*|propos\w*|consider\w*|pode|risco\w*|ameac\w*|pretende)\b/.test(
+    /\b(may|could|risk\w*|threat\w*|propos\w*|consider\w*|plans?|discuss\w*|talks|negotiat\w*|intend\w*|pode|risco\w*|ameac\w*|pretende)\b/.test(
       text,
     );
   const conflict = themes.some((theme) =>

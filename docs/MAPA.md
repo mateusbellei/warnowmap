@@ -1,20 +1,14 @@
-# Mapa como visualização principal
+# Leitura do mapa
 
-O mapa passa a ser o ponto de entrada em desktop e celular. A cronologia ocupa um painel de contexto à direita no desktop; o controle temporal fica abaixo do mapa. Indicadores numéricos ficam depois do monitor para preservar a área cartográfica no primeiro carregamento. No celular, o botão de alternância abre a linha do tempo e a seleção de um relato retorna ao mapa.
+O mapa é a visualização principal de acontecimentos agrupados, sincronizada com a cronologia e seus filtros.
 
-## Leitura visual
+- **Áreas azuis e contadores nacionais:** países citados em notícias sem localização mais específica. Contagens por país podem incluir o mesmo acontecimento e não devem ser somadas. Clique para filtrar a cronologia.
+- **Símbolos pontuais e anéis:** coordenadas regionais/locais extraídas do provedor. Categorias distinguem confronto, violência, tensão e diplomacia. Coordenada extraída não confirma o local de ataque.
+- **Densidade:** disponível apenas para pontos com granularidade além do país; não mede vítimas, intensidade ou controle territorial.
+- **Dourado:** sinal econômico relatado ou potencial. Os detalhes distinguem estágio, evidência e limites.
 
-O bloco “Conflitos em destaque” dá maior hierarquia aos confrontos armados e à violência, com contagens do recorte atual. “Focar conflitos” seleciona essas duas categorias e retorna à visualização do mapa; “Ver todas as categorias” restaura as quatro. Os demais filtros são preservados, inclusive Economia. O foco pode ser compartilhado com `?focus=conflicts`. Pontos dessas categorias recebem ícones e halos maiores; a cronologia usa bordas e fundos correspondentes. O destaque não representa gravidade, confirmação editorial ou contagem de guerras.
+Selecionar um acontecimento com referências nacionais destaca os países mencionados. A visualização não cria setas de agressor para alvo. A camada nacional usa Natural Earth em domínio público, escala 1:110m, incluída no projeto. Áreas pequenas podem não ter geometria; a lista mantém os registros. A cartografia de fundo é OpenFreeMap/OpenMapTiles/OpenStreetMap, com atribuição.
 
-- Confronto: losango com alvo; violência: triângulo com alerta; tensão: hexágono com raio; diplomacia: balões de diálogo. Os ícones são desenhados localmente e não dependem só da cor.
-- Os agrupamentos usam anéis proporcionais às quatro categorias. O número central é o **total de relatos**, não a quantidade de confrontos. O hover mostra a composição numérica, e o clique amplia o agrupamento.
-- O relato selecionado recebe uma camada independente de destaque, permanecendo visível mesmo quando sua posição pertence a um agrupamento.
-- “Ajustar mapa aos relatos” enquadra os registros filtrados. “Visão global” restaura a visão mundial. A navegação temporal continua determinando quais dados aparecem no mapa.
-- “Filtrar pela área visível” limita a cronologia às coordenadas atualmente enquadradas. O mapa preserva a fonte global do recorte temporal, permitindo continuar navegando. A função trata o antimeridiano e longitudes não normalizadas do motor cartográfico.
-- Densidade usa uma escala fria e representa concentração de relatos, não intensidade militar. Os pontos e anéis não representam controle territorial ou deslocamento de tropas.
+Filtros, busca, cronologia e seleção têm alternativa textual. O mapa suporta teclado, zoom, ajuste aos registros, mudança de estilo, orientação e movimento reduzido. Falhas WebGL mantêm a cronologia utilizável. A lista carrega em blocos de 40 entradas. O worker MapLibre é um asset local.
 
-## Desempenho e validação
-
-Marcadores e agrupamentos continuam em camadas WebGL. Os anéis são gerados sob demanda pelo resolvedor de imagens do MapLibre 6, reutilizados por composição e limitados a 256 texturas. A seleção atualiza apenas uma fonte com um ponto, evitando reconstruir e reagrupar todo o GeoJSON a cada clique.
-
-Os testes de geometria verificam limites inclusivos, antimeridiano, coordenadas inválidas, áreas globais e preservação da lista original. O conjunto passou com 30 testes. TypeScript, build e verificações visuais complementam a validação de símbolos, estilos, zoom, seleção e integração com a cronologia.
+Não há delimitação de frentes, posições de tropas ou territórios controlados. Esses dados exigem fontes e revisão próprias. Limites metodológicos e operação: `VERSAO-1.md`, `QUALIDADE.md`, `OPERACAO.md`.

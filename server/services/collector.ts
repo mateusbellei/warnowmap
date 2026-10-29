@@ -53,7 +53,7 @@ export async function collectFeed(
       return previous;
     stage = "archive";
     let archive: ArrayBuffer | undefined;
-    for (const candidate of exportCandidates(date)) {
+    for (const candidate of exportCandidates(date).slice(0, 3)) {
       try {
         archive = await $fetch<ArrayBuffer>(candidate.url, {
           timeout: 3000,
@@ -63,13 +63,15 @@ export async function collectFeed(
         date = candidate.date;
         break;
       } catch (error) {
-        if ((error as { statusCode?: number }).statusCode !== 404) throw error;
+        if ((error as { statusCode?: number }).statusCode !== 404) break;
       }
     }
-    if (!archive)
-      throw new Error("Nenhum lote publicado nas últimas três horas");
-    if (archive.byteLength > 10_000_000)
-      throw new Error("Arquivo muito grande");
+    if (!archive || archive.byteLength > 10_000_000) {
+      console.warn(
+        "GDELT: extrações CAMEO indisponíveis; coleta de notícias GKG preservada",
+      );
+      archive = undefined;
+    }
     const batchDates = [
       ...new Set([
         ...(previous?.coverage?.batchDates ??
@@ -84,7 +86,15 @@ export async function collectFeed(
       )
       .sort();
     stage = "decode";
-    let incoming = parseGdeltExport(decodeExport(new Uint8Array(archive)));
+    let incoming: EventFeed["events"] = [];
+    if (archive)
+      try {
+        incoming = parseGdeltExport(decodeExport(new Uint8Array(archive)));
+      } catch {
+        console.warn(
+          "GDELT: falha na extração CAMEO; prosseguindo com notícias GKG",
+        );
+      }
     // GKG é uma fonte de notícias independente do número de extrações CAMEO.
     // Uma instância nova recupera até duas horas; duas transferências por vez.
     const completed = new Set(previous?.coverage?.contextBatchDates ?? []);

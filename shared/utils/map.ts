@@ -39,3 +39,26 @@ export function eventsInView(
     ? events.filter((event) => withinBounds(event.coordinates, bounds))
     : events;
 }
+export function countryReferences(
+  events: import("../types/conflict").ConflictEvent[],
+) {
+  const countries = new Map<
+    string,
+    { code: string; name: string; ids: Set<string> }
+  >();
+  for (const event of events)
+    if (event.locationPrecision === "country")
+      for (const country of event.countries) {
+        const current = countries.get(country.code) ?? {
+          ...country,
+          ids: new Set<string>(),
+        };
+        current.ids.add(event.id);
+        countries.set(country.code, current);
+      }
+  return [...countries.values()].map((item) => ({
+    code: item.code,
+    name: item.name,
+    count: item.ids.size,
+  }));
+}

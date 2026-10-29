@@ -10,7 +10,7 @@ Notícias do GKG precisam de combinação de manchete com assunto específico e 
 
 As extrações CAMEO mantêm uma via mais restrita: códigos específicos, papéis explícitos de militares/grupos armados ou governos, conforme a ação, tema e manchete coerentes, incluindo os países associados. Sem manchete/contexto não entram. Códigos genéricos 180/190/200, visitas, elogios, consultas rotineiras e comércio geral não bastam. Temas amplos de crime, morte, justiça ou fragilidade não provam conflito. Obituários e retrospectivas reconhecidos pela manchete são excluídos.
 
-Há uma entrada por URL, priorizando a matéria com países da manchete em relação às extrações incidentais. Isso não deduplica fatos entre fontes, versões sindicadas ou URLs com parâmetros diferentes. A interface mostra motivo de inclusão e mantém o link original.
+A triagem seleciona uma publicação por URL e prioriza a manchete em relação às extrações incidentais. A resposta agrupa URLs canônicas e manchetes equivalentes, preservando as origens. Isso não confirma identidade factual ou independência editorial. Ver `VERSAO-1.md` para regras de agrupamento, situações narrativas e evidência econômica.
 
 ## Países, localização e tempo
 

@@ -32,6 +32,20 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe("API com persistência configurada", () => {
+  it("não declara saúde normal quando o lote está antigo apesar de uma tentativa recente", async () => {
+    mocks.load.mockResolvedValue({
+      events: [],
+      mode: "stale",
+      fetchedAt: new Date().toISOString(),
+      datasetAt: "2024-01-01T00:00:00Z",
+      coverage: { contextStatus: "complete" },
+    });
+    mocks.health.mockResolvedValue({ reports: 0, lastRun: null });
+    const handler = (await import("../server/api/health.get"))
+      .default as unknown as (event: object) => Promise<{ status: string }>;
+    expect((await handler({})).status).toBe("degraded");
+    expect(setResponseStatus).toHaveBeenCalledWith({}, 503);
+  });
   it("lê snapshot sem executar coleta nem migrações", async () => {
     const feed: EventFeed = {
       events: [],

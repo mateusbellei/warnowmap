@@ -54,6 +54,19 @@ function newsArchive(date: string) {
   return zipSync({ [`${date}.gkg.csv`]: strToU8(row.join("\t")) }).buffer;
 }
 describe("API de relatos", () => {
+  it("mantém notícias quando os arquivos CAMEO não estão disponíveis", async () => {
+    const date = stamp();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("lastupdate.txt"))
+        return `100 hash http://data.gdeltproject.org/gdeltv2/${date}.export.CSV.zip`;
+      if (url.endsWith(".export.CSV.zip")) throw { statusCode: 404 };
+      return newsArchive(/\/(\d{14})\.gkg/.exec(url)![1]!);
+    });
+    const result = await (await handler())({});
+    expect(result.mode).toBe("live");
+    expect(result.summary?.reports).toBe(8);
+    expect(result.events).toHaveLength(1);
+  });
   it("revalida uma única vez um 404 de contexto que ficou no cache regional do provedor", async () => {
     const date = stamp();
     fetchMock.mockImplementation(async (url: string) => {

@@ -16,6 +16,8 @@ import {
 } from "#shared/types/conflict";
 import type { MapBounds } from "#shared/utils/map";
 import { eventIcon, clusterRing } from "~/utils/map-icons";
+import { countryReferences } from "#shared/utils/map";
+import type { FeatureCollection, Geometry } from "geojson";
 
 const props = defineProps<{
   events: ConflictEvent[];
@@ -25,6 +27,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [id: string];
   viewport: [bounds: MapBounds];
+  country: [code: string];
 }>();
 const container = ref<HTMLDivElement>();
 const failure = ref(false);
@@ -33,6 +36,55 @@ let map: WorldMap | undefined;
 let resize: ResizeObserver | undefined;
 let popup: Popup | undefined;
 const ringImages = new Set<string>();
+let boundaries: FeatureCollection<
+  Geometry,
+  { code: string; name: string; x: number; y: number }
+> = { type: "FeatureCollection", features: [] };
+const referenceData = () => {
+  const counts = new Map(
+    countryReferences(props.events).map((item) => [item.code, item]),
+  );
+  return {
+    type: "FeatureCollection" as const,
+    features: boundaries.features.flatMap((feature) => {
+      const item = counts.get(feature.properties.code);
+      return item
+        ? [
+            {
+              type: "Feature" as const,
+              geometry: {
+                type: "Point" as const,
+                coordinates: [feature.properties.x, feature.properties.y],
+              },
+              properties: {
+                code: item.code,
+                name: item.name,
+                count: item.count,
+              },
+            },
+          ]
+        : [];
+    }),
+  };
+};
+function updateReferences() {
+  if (!map?.getSource("country-references")) return;
+  (map.getSource("country-counts") as GeoJSONSource).setData(referenceData());
+  const codes = countryReferences(props.events).map((item) => item.code);
+  map.setFilter("country-area", ["in", ["get", "code"], ["literal", codes]]);
+  map.setFilter("country-border", ["in", ["get", "code"], ["literal", codes]]);
+  const selected = eventIndex.value.get(props.selected ?? "");
+  map.setFilter("country-selection", [
+    "in",
+    ["get", "code"],
+    [
+      "literal",
+      selected?.locationPrecision === "country"
+        ? selected.countries.map((c) => c.code)
+        : [],
+    ],
+  ]);
+}
 const eventIndex = computed(
   () => new Map(props.events.map((event) => [event.id, event])),
 );
@@ -40,20 +92,66 @@ const reducedMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const geojson = () => ({
   type: "FeatureCollection" as const,
-  features: props.events.map((event) => ({
-    type: "Feature" as const,
-    geometry: { type: "Point" as const, coordinates: event.coordinates },
-    properties: {
-      id: event.id,
-      kind: event.kind,
-      economic: event.economy ? 1 : 0,
-    },
-  })),
+  features: props.events
+    .filter((event) => event.locationPrecision !== "country")
+    .map((event) => ({
+      type: "Feature" as const,
+      geometry: { type: "Point" as const, coordinates: event.coordinates },
+      properties: {
+        id: event.id,
+        kind: event.kind,
+        economic: event.economy ? 1 : 0,
+      },
+    })),
 });
 const style = () =>
   `https://tiles.openfreemap.org/styles/${light.value ? "positron" : "dark"}`;
 function addLayers() {
   if (!map || map.getSource("events")) return;
+  map.addSource("country-references", { type: "geojson", data: boundaries });
+  map.addLayer({
+    id: "country-area",
+    type: "fill",
+    source: "country-references",
+    paint: { "fill-color": "#80adc1", "fill-opacity": 0.16 },
+  });
+  map.addLayer({
+    id: "country-border",
+    type: "line",
+    source: "country-references",
+    paint: { "line-color": "#80adc1", "line-width": 1.1, "line-opacity": 0.7 },
+  });
+  map.addLayer({
+    id: "country-selection",
+    type: "line",
+    source: "country-references",
+    paint: { "line-color": "#edcb7b", "line-width": 2.5 },
+  });
+  map.addSource("country-counts", { type: "geojson", data: referenceData() });
+  map.addLayer({
+    id: "reference-dots",
+    type: "circle",
+    source: "country-counts",
+    paint: {
+      "circle-radius": 15,
+      "circle-color": "#162a35",
+      "circle-stroke-width": 1.5,
+      "circle-stroke-color": "#80adc1",
+    },
+  });
+  map.addLayer({
+    id: "reference-counts",
+    type: "symbol",
+    source: "country-counts",
+    layout: {
+      "text-field": ["to-string", ["get", "count"]],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": 12,
+      "text-allow-overlap": true,
+    },
+    paint: { "text-color": "#e2f0f7" },
+  });
+  updateReferences();
   for (const kind of [
     "armed",
     "violence",
@@ -245,18 +343,19 @@ function selectionData() {
   const event = eventIndex.value.get(props.selected ?? "");
   return {
     type: "FeatureCollection" as const,
-    features: event
-      ? [
-          {
-            type: "Feature" as const,
-            geometry: {
-              type: "Point" as const,
-              coordinates: event.coordinates,
+    features:
+      event && event.locationPrecision !== "country"
+        ? [
+            {
+              type: "Feature" as const,
+              geometry: {
+                type: "Point" as const,
+                coordinates: event.coordinates,
+              },
+              properties: { kind: event.kind },
             },
-            properties: { kind: event.kind },
-          },
-        ]
-      : [],
+          ]
+        : [],
   };
 }
 function updateData() {
@@ -267,6 +366,7 @@ function updateSelection() {
   (map?.getSource("selection") as GeoJSONSource | undefined)?.setData(
     selectionData(),
   );
+  updateReferences();
 }
 function reportViewport() {
   if (!container.value?.clientWidth || !container.value.clientHeight) return;
@@ -286,6 +386,9 @@ function fitEvents() {
     props.events[0]!.coordinates,
   );
   for (const event of props.events) bounds.extend(event.coordinates);
+  referenceData().features.forEach((feature) =>
+    bounds.extend(feature.geometry.coordinates as [number, number]),
+  );
   map.fitBounds(bounds, {
     padding: { top: 85, bottom: 95, left: 55, right: 40 },
     maxZoom: 6,
@@ -310,21 +413,43 @@ function toggleStyle() {
   light.value = !light.value;
   map?.setStyle(style());
 }
+function focusEvent(event: ConflictEvent) {
+  if (!map) return;
+  if (event.locationPrecision === "country") {
+    const references = boundaries.features.filter((feature) =>
+      event.countries.some(
+        (country) => country.code === feature.properties.code,
+      ),
+    );
+    if (references.length > 1) {
+      const bounds = new LngLatBounds();
+      references.forEach((feature) =>
+        bounds.extend([feature.properties.x, feature.properties.y]),
+      );
+      map.fitBounds(bounds, {
+        padding: { top: 90, bottom: 150, left: 40, right: 40 },
+        maxZoom: 3,
+        duration: reducedMotion() ? 0 : 800,
+      });
+      return;
+    }
+  }
+  map.flyTo({
+    center: event.coordinates,
+    zoom:
+      event.locationPrecision === "country"
+        ? 2.5
+        : Math.max(map.getZoom(), 4.5),
+    duration: reducedMotion() ? 0 : 800,
+  });
+}
 watch(() => props.events, updateData);
 watch(
   () => props.selected,
   (id) => {
     updateSelection();
     const event = props.events.find((event) => event.id === id);
-    if (event)
-      map?.flyTo({
-        center: event.coordinates,
-        zoom:
-          event.locationPrecision === "country"
-            ? 3
-            : Math.max(map.getZoom(), 4.5),
-        duration: reducedMotion() ? 0 : 1000,
-      });
+    if (event) focusEvent(event);
   },
 );
 watch(
@@ -336,9 +461,13 @@ watch(
 );
 watch(
   container,
-  (element) => {
+  async (element) => {
     if (!element || map) return;
     try {
+      const response = await fetch("/data/countries.geojson");
+      if (!response.ok) throw new Error("Country geometry unavailable");
+      boundaries = await response.json();
+      if (!element.isConnected) return;
       setWorkerUrl(workerUrl);
       map = new WorldMap({
         container: element,
@@ -381,6 +510,42 @@ watch(
         reportViewport();
       });
       map.on("moveend", reportViewport);
+      for (const layer of [
+        "reference-dots",
+        "reference-counts",
+        "country-area",
+      ]) {
+        map.on("click", layer, (event) => {
+          const code = event.features?.[0]?.properties?.code;
+          if (code) emit("country", String(code));
+        });
+        map.on("mouseenter", layer, (event) => {
+          if (!map) return;
+          map.getCanvas().style.cursor = "pointer";
+          const code = event.features?.[0]?.properties?.code;
+          const item = countryReferences(props.events).find(
+            (item) => item.code === code,
+          );
+          if (!item) return;
+          const content = document.createElement("div");
+          content.className = "map-hover-content";
+          const strong = document.createElement("strong");
+          strong.textContent = `${item.name} · ${item.count} acontecimentos com menção ao país`;
+          const note = document.createElement("p");
+          note.textContent =
+            "Referência nacional. Não localiza ataques ou controle territorial. Clique para filtrar a cronologia.";
+          content.append(strong, note);
+          popup?.remove();
+          popup = new Popup({ closeButton: false, offset: 15 })
+            .setLngLat(event.lngLat)
+            .setDOMContent(content)
+            .addTo(map);
+        });
+        map.on("mouseleave", layer, () => {
+          if (map) map.getCanvas().style.cursor = "";
+          popup?.remove();
+        });
+      }
       map.on("click", "points", (event) => {
         const id = event.features?.[0]?.properties?.id;
         if (id) emit("select", String(id));

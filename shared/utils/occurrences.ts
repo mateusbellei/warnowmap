@@ -32,25 +32,30 @@ const normalizeTitle = (value: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 export function classifyNarrative(event: ConflictEvent) {
-  const text = event.title.toLowerCase();
+  const text = event.title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
   const situation: NonNullable<ConflictEvent["situation"]> =
     /\b(denies|denied|rejects|disputes|nega|desmente|contesta)\b/.test(text)
       ? "contested"
-      : /\b(threat\w*|plans? to|consider\w*|ameac\w*|pretende)\b/.test(text)
-        ? "threatened"
-        : /\b(agreement signed|signs? (a |the )?(peace |ceasefire )?(deal|agreement)|acordo assinado)\b/.test(
-              text,
-            )
-          ? "agreement"
-          : /talk|negoti|mediat|mediac|pourparlers/i.test(text)
-            ? "negotiation"
-            : /\b(announc\w*|anuncia\w*)\b/.test(text)
-              ? "announced"
-              : "reported";
+      : /threat.{0,15}level|alert level|nivel de alerta/.test(text)
+        ? "announced"
+        : /\b(threat\w*|plans? to|consider\w*|ameac\w*|pretende)\b/.test(text)
+          ? "threatened"
+          : /\b(agreement signed|signs? (a |the )?(peace |ceasefire )?(deal|agreement)|acordo assinado)\b/.test(
+                text,
+              )
+            ? "agreement"
+            : /talk|negoti|mediat|mediac|pourparlers/i.test(text)
+              ? "negotiation"
+              : /\b(announc\w*|anuncia\w*)\b/.test(text)
+                ? "announced"
+                : "reported";
   const contentType: NonNullable<ConflictEvent["contentType"]> =
     /\/liveblog\/|\/live-updates\//.test(event.sourceUrl)
       ? "liveblog"
-      : /\b(opinion|editorial|analysis|commentary|op-ed|on point)\b/i.test(
+      : /\b(opinion|editorial|analysis|commentary|op-ed)\b|on point|\/onpoint[/.]/i.test(
             event.title + " " + new URL(event.sourceUrl).pathname,
           )
         ? "analysis"
@@ -136,8 +141,16 @@ export function groupOccurrences(input: ConflictEvent[]): ConflictEvent[] {
           urls.size === 1
             ? ("canonical-url" as const)
             : ("matching-headline" as const),
-        firstSeenAt: events[0]!.firstSeenAt ?? events[0]!.reportedAt,
-        lastSeenAt: primary.lastSeenAt ?? primary.reportedAt,
+        firstSeenAt: events
+          .map((event) => event.firstSeenAt)
+          .filter((value): value is string => !!value)
+          .sort()[0],
+        lastSeenAt:
+          events
+            .map((event) => event.lastSeenAt)
+            .filter((value): value is string => !!value)
+            .sort()
+            .at(-1) ?? primary.reportedAt,
       };
     })
     .sort(

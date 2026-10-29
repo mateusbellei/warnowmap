@@ -24,3 +24,7 @@ Os códigos mantêm zeros iniciais. Não são usados códigos genéricos de guer
 “Medida relatada” indica a classificação automática do texto, sem confirmação editorial. Os efeitos apresentados são mecanismos possíveis, não consequências comprovadas. Bloqueios não demonstram por si só interrupção comercial. Cooperação econômica pode ocorrer sem relação causal com o conflito; essa associação exige a leitura da fonte. Não inferimos petróleo, inflação, PIB, cotações, vítimas econômicas ou valores de perdas. O feed não fornece esses indicadores de forma suficiente para exibi-los como dados observados.
 
 As limitações de cobertura, atualização e retenção do feed existente permanecem. Ausência de sinais econômicos classificados não significa ausência de impactos.
+
+## Versão consolidada
+
+Os sinais são agrupados por acontecimento, sem multiplicar republicações. A apresentação distingue medida mencionada, interrupção relatada, efeito descrito pela fonte e risco/intenção, preservando manchete, fonte e data. Planos e discussões não comprovam execução. Notícias sobre circulação e variação econômica exigem menção explícita ao contexto de conflito e tema compatível; não há cotação, estimativa de perdas ou causalidade confirmada. Veja `docs/VERSAO-1.md`.

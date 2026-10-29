@@ -27,6 +27,17 @@ describe("sinais econômicos", () => {
       ])?.stage,
     ).toBe("risk");
     expect(
+      headlineEconomicSignal(
+        "Iran discussing plan to end war, reopen Strait of Hormuz",
+        ["ARMEDCONFLICT"],
+      )?.stage,
+    ).toBe("risk");
+    expect(
+      headlineEconomicSignal("Russia talks with US to lift sanctions", [
+        "SANCTIONS",
+      ])?.stage,
+    ).toBe("risk");
+    expect(
       headlineEconomicSignal("Oil prices surge on earnings news", [
         "ARMEDCONFLICT",
       ]),

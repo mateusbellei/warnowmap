@@ -1,0 +1,232 @@
+.monitor-overview {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: #132129;
+}
+.monitor-overview div {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.monitor-overview strong {
+  font-size: 22px;
+  color: #daeaf1;
+}
+.monitor-overview span,
+.monitor-overview small {
+  font-size: 10px;
+  color: #9bb3be;
+}
+.monitor-overview small {
+  margin-left: auto;
+}
+.quick-windows {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.quick-windows > span {
+  font-size: 10px;
+  color: var(--muted);
+  margin-right: 5px;
+}
+.quick-windows button,
+.quick-windows select {
+  background: #172329;
+  color: #b6c8d0;
+  padding: 7px 10px;
+  border: 1px solid #35474f;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.quick-windows button.active {
+  background: #29433d;
+  border-color: #82baa3;
+  color: #edf9f3;
+}
+.quick-windows select {
+  margin-left: auto;
+  max-width: 220px;
+}
+.occurrence-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.occurrence-badges span {
+  background: #26343d;
+  border: 1px solid #3a4a53;
+  color: #b6cbd5;
+  font-size: 9px;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.occurrence-context {
+  border-block: 1px solid #3b4a50;
+  margin: 12px 0;
+  padding: 12px 0;
+}
+.occurrence-context details {
+  margin-top: 10px;
+}
+.occurrence-context summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: #e4c499;
+}
+.occurrence-context p small {
+  display: block;
+  font-size: 10px;
+  color: #a1b7c2;
+  padding-top: 5px;
+}
+.source-reports {
+  margin: 12px 0;
+  padding-left: 18px;
+  max-height: 220px;
+  overflow: auto;
+}
+.source-reports li {
+  padding: 8px 0;
+  border-bottom: 1px solid #334249;
+}
+.source-reports a {
+  display: block;
+  color: #e9ab80;
+  font-size: 11px;
+}
+.source-reports span,
+.source-reports small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.5;
+  padding-top: 5px;
+}
+.observed-at {
+  font-size: 10px;
+  color: #9bb0bc;
+}
+.economic-evidence {
+  border-left: 2px solid #e5c178;
+  padding: 8px;
+  margin: 10px 0;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.map-topline button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 680px) {
+  .map-first-shell .page-heading {
+    margin: 0 0 8px;
+  }
+  .map-first-shell .page-heading h1 {
+    font-size: 20px;
+  }
+  .map-first-shell .relation-strip {
+    display: none;
+  }
+  .map-first-shell .diplomacy-monitor {
+    display: flex;
+    flex-direction: column;
+  }
+  .monitor-overview {
+    padding: 9px 12px;
+    gap: 12px;
+    flex-wrap: wrap;
+    order: 0;
+  }
+  .monitor-overview strong {
+    font-size: 19px;
+  }
+  .monitor-overview div {
+    gap: 5px;
+  }
+  .monitor-overview span {
+    max-width: 94px;
+    line-height: 1.4;
+  }
+  .monitor-overview small {
+    margin-left: 0;
+    font-size: 9px;
+  }
+  .map-first-shell .monitor-toolbar {
+    order: 1;
+    padding: 10px 12px;
+  }
+  .map-first-shell .quick-windows {
+    order: 2;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  .quick-windows select {
+    width: 100%;
+    max-width: none;
+    margin: 3px 0 0;
+  }
+  .quick-windows button {
+    padding: 7px 8px;
+  }
+  .map-first-shell .diplomacy-layout {
+    order: 3;
+    height: 60dvh;
+    min-height: 420px;
+  }
+  .map-first-shell .diplomacy-categories {
+    order: 4;
+  }
+  .map-first-shell .conflict-spotlight {
+    order: 5;
+    margin: 0;
+    padding: 12px;
+  }
+  .map-first-shell .economy-strip {
+    order: 6;
+    padding: 12px;
+  }
+  .map-first-shell .quality-summary {
+    order: 7;
+  }
+  .map-first-shell .filter-panel {
+    order: 2;
+  }
+  .map-first-shell .feed-status-banner {
+    order: 4;
+    margin: 0;
+    padding: 9px 12px;
+    font-size: 10px;
+  }
+  .map-first-shell .time-explorer {
+    order: 4;
+  }
+  .map-first-shell .monitor-footer {
+    order: 8;
+  }
+  .map-first-shell .conflict-heading p {
+    display: none;
+  }
+  .map-first-shell .event-detail {
+    max-width: calc(100% - 20px);
+  }
+}
+
+.time-bars span.uncovered i {
+  height: 100% !important;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 3px,
+    #73838b 3px 4px
+  ) !important;
+  opacity: 0.25;
+}
+.timeline-bar {
+  order: 8;
+}

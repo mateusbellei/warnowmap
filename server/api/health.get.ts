@@ -17,7 +17,12 @@ export default defineEventHandler(async (event) => {
     const age = feed?.fetchedAt
       ? Date.now() - Date.parse(feed.fetchedAt)
       : Infinity;
-    const ready = age < 3600000 && feed?.coverage?.contextStatus === "complete";
+    const ready =
+      age < 3600000 &&
+      feed?.mode === "live" &&
+      !!feed.datasetAt &&
+      Date.now() - Date.parse(feed.datasetAt) < 3600000 &&
+      feed.coverage?.contextStatus === "complete";
     if (!ready) setResponseStatus(event, 503);
     return {
       status: ready ? "ready" : "degraded",

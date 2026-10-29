@@ -42,6 +42,7 @@ export async function runIngestion(
     return { status: "busy" as const };
   try {
     let previous = await repository.load();
+    const priorSuccess = previous?.operation?.lastSuccessAt ?? null;
     const before = new Map(previous?.events.map((event) => [event.id, event]));
     const store: FeedStorage = {
       async getItem<T>() {
@@ -61,7 +62,18 @@ export async function runIngestion(
       lastSeenAt:
         event.lastSeenAt ?? before.get(event.id)?.lastSeenAt ?? observed,
     }));
-    const reports = selectEditorial(feed.events).events.length;
+    const selection = selectEditorial(feed.events);
+    const reports = selection.events.length;
+    feed.events = selection.events;
+    feed.quality = selection.quality;
+    feed.operation = {
+      ingestion: "external",
+      repository: repository.kind,
+      lastSuccessAt:
+        feed.mode === "live" && feed.coverage?.contextStatus === "complete"
+          ? observed
+          : priorSuccess,
+    };
     await repository.commit(
       feed,
       {

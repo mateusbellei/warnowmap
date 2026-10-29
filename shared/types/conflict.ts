@@ -104,7 +104,7 @@ export interface EventFeed {
     policy: "conservative-v1";
   };
   operation?: {
-    ingestion: "scheduled" | "on-demand";
+    ingestion: "external" | "on-demand";
     repository: "postgres" | "sqlite" | "temporary";
     lastSuccessAt: string | null;
   };
