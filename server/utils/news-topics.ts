@@ -11,6 +11,35 @@ export function articleTopic(
   themes: string[],
 ): { kind: EventKind; reason: string } | null {
   const text = normalizeText(headline);
+  const kinetic =
+    /air\s?strike\w*|bombard\w*|shelling|gunfire|artillery|drone\w*.{0,25}(attack|strike|hit)|missile\w*.{0,25}(attack|strike|hit)|armed attack|bombing|bomb (attack|blast)|tiroteio|ataque aereo|bombardeio/.test(
+      text,
+    );
+  const sport =
+    /\b(world cup|fifa|uefa|football|soccer|premier league|champions league|cricket|rugby|tennis|basketball|futebol|copa do mundo|campeonato|olympics|olimpic\w*)\b/.test(
+      text,
+    );
+  const electoral =
+    /\b(debate|senate race|election campaign|electoral|debate eleitoral|campanha eleitoral)\b/.test(
+      text,
+    );
+  const attackAtVenue =
+    /(?:missile|drone|airstrike|bomb|missil|bomba).{0,30}(?:hits?|strikes?|kills?|atinge|ataca).{0,40}(?:stadium|football|debate|estadio|futebol)/.test(
+      text,
+    );
+  if ((sport || electoral) && !attackAtVenue) return null;
+  if (
+    /\b(convict\w*|sentenc(?:ed|ing)|acquitt\w*|verdict|condenad[oa]s?|sentenciado|absolvido)\b/.test(
+      text,
+    )
+  )
+    return null;
+  if (
+    /\b(trial|court|prosecutor\w*|jury|tribunal|julgamento)\b/.test(text) &&
+    /genocid\w*|war crimes?|perjury|testimony|fraud/.test(text) &&
+    !/ceasefire|truce|cessar.fogo|tregua/.test(text)
+  )
+    return null;
   // Processos judiciais e opiniões sobre ataques não relatam uma nova ação militar.
   if (
     /\b(court|judge|jury|tribunal)\b.{0,65}\b(convict\w*|sentenc\w*|acquit\w*|verdict|conden\w*|absolv\w*)\b/.test(
@@ -52,6 +81,17 @@ export function articleTopic(
   );
   const military = conflict || themes.includes("MILITARY");
   if (
+    military &&
+    /\b(expel\w*|eject\w*|expuls\w*)\b.{0,35}\bdiplomat\w*\b|\bdiplomat\w*\b.{0,35}\b(expel\w*|eject\w*|expuls\w*)\b/.test(
+      text,
+    )
+  )
+    return {
+      kind: "tension",
+      reason:
+        "Manchete sobre expulsão diplomática; não descreve confronto armado",
+    };
+  if (
     conflict &&
     /\b(war|conflict|guerra|conflito|hormuz|ormuz|red sea|blockade)\b/.test(
       text,
@@ -81,7 +121,10 @@ export function articleTopic(
     };
   if (
     conflict &&
-    /ceasefire|truce|peace (talks|deal|agreement|negotiation)|negotiat\w*|mediat\w*|cessar.fogo|tregua|negociac\w*|negociac\w*|mediac\w*|cessez.le.feu|pourparlers|وقف إطلاق النار/.test(
+    /\b(peace|ceasefire|truce|hostages?|nuclear|war|guerra|paz|cessar.fogo|tregua|humanitarian|prisoners?|border)\b/.test(
+      text,
+    ) &&
+    /ceasefire|truce|peace (talks|deal|agreement|negotiation)|(?:direct talks|talks).{0,50}end.{0,15}war|negotiat\w*|mediat\w*|cessar.fogo|tregua|negociac\w*|mediac\w*|cessez.le.feu|pourparlers|وقف إطلاق النار/.test(
       text,
     )
   )
@@ -111,6 +154,10 @@ export function articleTopic(
     };
   if (
     conflict &&
+    (kinetic ||
+      /\b(military|army|troops?|soldiers?|forces|rebels?|militia|houthis?|hamas|hezbollah|taliban|border|frontline|guerra|militar\w*|exercito|tropas|soldados|fronteira)\b/.test(
+        text,
+      )) &&
     /airstrike\w*|air strike\w*|missile.{0,25}(attack|strike|hit)|drone.{0,25}(attack|strike)|bombard\w*|shelling|clash\w*|fighting|offensive|invasion|invasao|ataque\w*|combate\w*|confronto\w*|enfrentamiento\w*|frappe\w*|боев|удар|صاروخ/.test(
       text,
     )

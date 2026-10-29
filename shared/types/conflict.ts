@@ -45,7 +45,11 @@ export interface ConflictEvent {
     country: CountryRef | null;
     roles: string[];
   }[];
-  articleContext?: { themes: string[]; headline?: string };
+  articleContext?: {
+    themes: string[];
+    headline?: string;
+    originalHeadline?: string;
+  };
   locationPrecision?: "country" | "region" | "local";
   selection?: { basis: "context" | "structured"; reasons: string[] };
   economy?: EconomicImpact;

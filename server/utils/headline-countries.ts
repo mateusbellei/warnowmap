@@ -43,6 +43,18 @@ const extra: Record<string, string[]> = {
   PAK: ["Pakistani", "paquistanês", "paquistanesa"],
   CUB: ["Cuban", "cubano", "cubana"],
   QAT: ["Qatari", "catariano", "catariana"],
+  SAU: ["Saudi", "Saudi Arabian", "saudita", "sauditas"],
+  COD: [
+    "DR Congo",
+    "DRC",
+    "D.R. Congo",
+    "Democratic Republic of Congo",
+    "Democratic Republic of the Congo",
+    "Congo-Kinshasa",
+    "RD Congo",
+    "RDC",
+  ],
+  COG: ["Republic of Congo", "Republic of the Congo", "Congo-Brazzaville"],
 };
 const entries = Object.entries(isoCountries.getAlpha3Codes()).map(
   ([code, alpha2]) => {
@@ -53,7 +65,9 @@ const entries = Object.entries(isoCountries.getAlpha3Codes()).map(
           ...(extra[code] ?? []),
         ]
           .map(normalizeText)
-          .filter((name) => name.length > 2),
+          .filter(
+            (name) => name.length > 2 && !(code === "COG" && name === "congo"),
+          ),
       ),
     ];
     const pattern = aliases

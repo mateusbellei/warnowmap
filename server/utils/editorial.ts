@@ -2,6 +2,7 @@ import type { ConflictEvent } from "../../shared/types/conflict";
 import { articleTopic } from "./news-topics";
 import { headlineCountries } from "./headline-countries";
 import { safeSourceUrl } from "../../shared/utils/events";
+import { cleanHeadline } from "./headline";
 
 const armedRoles = new Set(["MIL", "REB", "INS", "SEP", "UAF"]);
 const conflictThemes = new Set([
@@ -168,7 +169,44 @@ export function assessEvent(event: ConflictEvent): {
 
 export function selectEditorial(events: ConflictEvent[]) {
   const selected = new Map<string, ConflictEvent>();
-  for (const event of events) {
+  for (const original of events) {
+    let event = original;
+    if (
+      original.sourceType === "article" &&
+      original.articleContext?.headline
+    ) {
+      const originalHeadline =
+        original.articleContext.originalHeadline ??
+        original.articleContext.headline;
+      const headline = cleanHeadline(originalHeadline, original.sourceUrl);
+      const topic = articleTopic(headline, original.articleContext.themes);
+      if (!topic) continue;
+      const countries = headlineCountries(headline);
+      // Uma referência ancorada em país removido não pode conservar suas coordenadas.
+      const anchor = original.countries.find((country) =>
+        original.location.startsWith(country.name + " ·"),
+      );
+      if (anchor && !countries.some((country) => country.code === anchor.code))
+        continue;
+      event = {
+        ...original,
+        title: headline,
+        kind: topic.kind,
+        countries,
+        articleContext: {
+          ...original.articleContext,
+          headline,
+          originalHeadline,
+        },
+        countryPair:
+          countries.length === 2
+            ? countries
+                .map((country) => country.code)
+                .sort()
+                .join(":")
+            : null,
+      };
+    }
     const decision = assessEvent(event);
     if (decision.accepted) {
       const key = new URL(event.sourceUrl).href.split("#")[0]!;
@@ -180,23 +218,6 @@ export function selectEditorial(events: ConflictEvent[]) {
         continue;
       selected.set(key, {
         ...event,
-        ...(event.sourceType === "article"
-          ? (() => {
-              const countries = headlineCountries(
-                event.articleContext?.headline ?? event.title,
-              );
-              return {
-                countries,
-                countryPair:
-                  countries.length === 2
-                    ? countries
-                        .map((country) => country.code)
-                        .sort()
-                        .join(":")
-                    : null,
-              };
-            })()
-          : {}),
         stateLinked: explicitStateLink(event),
         selection: { basis: decision.basis!, reasons: [decision.reason] },
       });
