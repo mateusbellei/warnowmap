@@ -32,6 +32,7 @@ import {
   type EventFeed,
   type Region,
 } from "#shared/types/conflict";
+import { historyChanges } from "#shared/utils/visits";
 import { filterEvents } from "#shared/utils/events";
 import { economicSectors, economicStageLabels } from "#shared/utils/economy";
 import { eventsInView, type MapBounds } from "#shared/utils/map";
@@ -89,14 +90,10 @@ const referenceOnly = computed(() =>
     (item) => item.locationPrecision === "country",
   ),
 );
-const newEvents = computed(() =>
-  (feed.value?.events ?? []).filter(
-    (item) =>
-      previousVisit.value &&
-      Date.parse(item.lastSeenAt ?? item.firstSeenAt ?? item.reportedAt) >
-        Date.parse(previousVisit.value!),
-  ),
+const visitChanges = computed(() =>
+  historyChanges(feed.value, previousVisit.value),
 );
+const newEvents = computed(() => visitChanges.value.events);
 function setWindow(hours: number) {
   basis.value = "collected";
   windowHours.value = hours;
@@ -143,6 +140,13 @@ const loading = computed(
     (status.value === "idle" && !feed.value && !error.value),
 );
 const isDemo = computed(() => feed.value?.mode === "demo");
+watch(
+  () => visitChanges.value.available,
+  (available) => {
+    if (!available) onlyNew.value = false;
+  },
+);
+
 const days = computed(() => calendarDays(from.value, to.value));
 const cutoff = computed(
   () => days.value[Math.min(cursor.value, days.value.length - 1)] ?? "",
@@ -154,9 +158,7 @@ const baseEvents = computed(() =>
       (item) =>
         (!dossier.value || item.dossier?.id === dossier.value) &&
         (!onlyNew.value ||
-          (previousVisit.value &&
-            Date.parse(item.lastSeenAt ?? item.firstSeenAt ?? item.reportedAt) >
-              Date.parse(previousVisit.value))),
+          newEvents.value.some((changed) => changed.id === item.id)),
     ),
     {
       search: search.value,
@@ -745,7 +747,7 @@ onBeforeUnmount(() => {
               {{ window.label }}
             </button>
             <button
-              v-if="previousVisit"
+              v-if="visitChanges.available"
               :class="{ active: onlyNew }"
               @click="onlyNew = !onlyNew"
             >
