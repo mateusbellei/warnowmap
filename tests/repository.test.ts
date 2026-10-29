@@ -7,6 +7,7 @@ import { postgresRepository } from "../server/database/postgres";
 import type { FeedRepository } from "../server/database/repository";
 import type { EventFeed } from "../shared/types/conflict";
 import { validIngestionToken } from "../server/utils/ingestion-auth";
+import { demoEvents } from "../server/data/demo";
 const repos: FeedRepository[] = [];
 const folders: string[] = [];
 afterEach(async () => {
@@ -23,7 +24,25 @@ export async function repositoryContract(repo: FeedRepository) {
   expect(await repo.acquire("worker-a", now, expires)).toBe(true);
   expect(await repo.acquire("worker-b", now, expires)).toBe(false);
   const feed: EventFeed = {
-    events: [],
+    events: [
+      {
+        ...demoEvents[0]!,
+        id: "report-a",
+        demo: false,
+        sourceType: "article",
+        countryBasis: "headline",
+        locationPrecision: "country",
+        reportedAt: now,
+        eventDate: now.slice(0, 10),
+        title: "Russian drones attack Ukraine in renewed offensive",
+        sourceUrl: "https://example.org/report",
+        participants: [],
+        articleContext: {
+          headline: "Russian drones attack Ukraine in renewed offensive",
+          themes: ["ARMEDCONFLICT", "MILITARY"],
+        },
+      },
+    ],
     mode: "live",
     provider: "GDELT 2.0",
     fetchedAt: now,
@@ -35,13 +54,18 @@ export async function repositoryContract(repo: FeedRepository) {
     startedAt: now,
     endedAt: now,
     status: "success" as const,
-    reports: 0,
+    reports: 1,
   };
   await expect(
     repo.commit({ ...feed, message: "unauthorized" }, run, "worker-b"),
   ).rejects.toThrow("LEASE_LOST");
   expect(await repo.load()).toBeNull();
   await repo.commit(feed, run, "worker-a");
+  await repo.commit(feed, run, "worker-a");
+  expect((await repo.health()).reports).toBe(1);
+  expect((await repo.load())?.events[0]?.countries).toEqual(
+    feed.events[0]?.countries,
+  );
   expect((await repo.load())?.message).toBe("snapshot");
   await repo.release("worker-b");
   expect(await repo.acquire("worker-b", now, expires)).toBe(false);
