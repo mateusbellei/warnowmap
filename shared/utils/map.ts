@@ -1,4 +1,14 @@
 import type { ConflictEvent } from "../types/conflict";
+export function countryGeometryCode(code: string): string {
+  return (
+    (
+      { SAH: "ESH", PSX: "PSE", KOS: "KSV", SDS: "SSD" } as Record<
+        string,
+        string
+      >
+    )[code] ?? code
+  );
+}
 
 export type MapBounds = [
   west: number,

@@ -4,6 +4,10 @@ Monitor global de **confrontos e diplomacia entre países**, com Nuxt 4, TypeScr
 
 A camada **Economia** resume sanções, comércio, ajuda econômica e rotas/logística. Um filtro destaca os relatos relacionados no mapa e na cronologia, separando medidas relatadas de ameaças ou intenções. Não estima perdas nem preços. Veja o escopo e a metodologia em [ECONOMIA.md](ECONOMIA.md).
 
+## Inteligência por país (1.2)
+
+Perfis nacionais reúnem séries oficiais do Banco Mundial, comparação entre dois países e acompanhamento local de favoritos. O mapa alterna entre acontecimentos, estabilidade política anual e atividade no noticiário. Notícias podem ser lidas por histórias com publicações relacionadas; novidades automáticas aguardam aplicação pelo leitor. Consulte [INTELIGENCIA-PAISES.md](docs/INTELIGENCIA-PAISES.md) para metodologia, atualização e limites. O índice dinâmico de instabilidade depende de histórico contínuo e fontes operacionais adicionais.
+
 ## Executar
 
 Use **Node 24.15+**, ou uma versão compatível declarada em `package.json`. O Node global 22.18 desta máquina é anterior ao mínimo do Nuxt atual. Com nvm: `nvm install 24.15.0` e `nvm use 24.15.0`.

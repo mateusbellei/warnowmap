@@ -5,6 +5,7 @@ import {
   LngLatBounds,
   setWorkerUrl,
   type GeoJSONSource,
+  type ExpressionSpecification,
 } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -17,12 +18,18 @@ import {
 import type { MapBounds } from "#shared/utils/map";
 import { eventIcon, clusterRing } from "~/utils/map-icons";
 import { countryReferences } from "#shared/utils/map";
+import { countryGeometryCode } from "#shared/utils/map";
 import type { FeatureCollection, Geometry } from "geojson";
 
+import type { CountryCatalogItem } from "#shared/types/country";
+import { stabilityColor } from "#shared/utils/country";
 const props = defineProps<{
   events: ConflictEvent[];
   selected: string | null;
   heatmap: boolean;
+  countryLayer?: "events" | "stability" | "activity";
+  catalog?: CountryCatalogItem[];
+  profileCountry?: string;
 }>();
 const emit = defineEmits<{
   select: [id: string];
@@ -71,6 +78,7 @@ function updateReferences() {
   if (!map?.getSource("country-references")) return;
   (map.getSource("country-counts") as GeoJSONSource).setData(referenceData());
   const codes = countryReferences(props.events).map((item) => item.code);
+  updateCountryLayers();
   map.setFilter("country-area", ["in", ["get", "code"], ["literal", codes]]);
   map.setFilter("country-border", ["in", ["get", "code"], ["literal", codes]]);
   const selected = eventIndex.value.get(props.selected ?? "");
@@ -79,11 +87,79 @@ function updateReferences() {
     ["get", "code"],
     [
       "literal",
-      selected?.locationPrecision === "country"
-        ? selected.countries.map((c) => c.code)
-        : [],
+      [
+        ...(selected?.locationPrecision === "country"
+          ? selected.countries.map((c) => c.code)
+          : []),
+        ...(props.profileCountry ? [props.profileCountry] : []),
+      ],
     ],
   ]);
+}
+function updateCountryLayers() {
+  if (!map?.getLayer("country-statistics")) return;
+  const mode = props.countryLayer ?? "events";
+  const counts = new Map(
+    countryReferences(props.events).map((country) => [
+      country.code,
+      country.count,
+    ]),
+  );
+  const colors = (props.catalog ?? []).flatMap((country) => [
+    country.code,
+    mode === "stability"
+      ? stabilityColor(country.stability?.value ?? null)
+      : (counts.get(country.code) ?? 0) > 10
+        ? "#f18d67"
+        : (counts.get(country.code) ?? 0) > 3
+          ? "#ddbf7b"
+          : (counts.get(country.code) ?? 0) > 0
+            ? "#78b2c7"
+            : "#33404a",
+  ]);
+  const colorExpression: ExpressionSpecification = [
+    "match",
+    ["get", "code"],
+    "__none",
+    "#596771",
+    ...colors,
+    "#596771",
+  ];
+  map.setPaintProperty(
+    "country-statistics",
+    "fill-color",
+    colors.length ? colorExpression : "#596771",
+  );
+  map.setLayoutProperty(
+    "country-statistics",
+    "visibility",
+    mode === "events" ? "none" : "visible",
+  );
+  map.setLayoutProperty(
+    "country-area",
+    "visibility",
+    mode === "events" ? "visible" : "none",
+  );
+  for (const layer of [
+    "reference-dots",
+    "reference-counts",
+    "points",
+    "clusters",
+    "cluster-count",
+  ]) {
+    if (map.getLayer(layer))
+      map.setLayoutProperty(
+        layer,
+        "visibility",
+        mode === "events" ? "visible" : "none",
+      );
+  }
+  if (map.getLayer("heat"))
+    map.setLayoutProperty(
+      "heat",
+      "visibility",
+      mode === "events" && props.heatmap ? "visible" : "none",
+    );
 }
 const eventIndex = computed(
   () => new Map(props.events.map((event) => [event.id, event])),
@@ -120,6 +196,18 @@ function addLayers() {
     type: "line",
     source: "country-references",
     paint: { "line-color": "#80adc1", "line-width": 1.1, "line-opacity": 0.7 },
+  });
+  map.addLayer({
+    id: "country-statistics",
+    type: "fill",
+    source: "country-references",
+    paint: { "fill-color": "#596771", "fill-opacity": 0.55 },
+  });
+  map.addLayer({
+    id: "country-hit",
+    type: "fill",
+    source: "country-references",
+    paint: { "fill-color": "#000", "fill-opacity": 0 },
   });
   map.addLayer({
     id: "country-selection",
@@ -338,6 +426,7 @@ function addLayers() {
       "icon-allow-overlap": true,
     },
   });
+  updateCountryLayers();
 }
 function selectionData() {
   const event = eventIndex.value.get(props.selected ?? "");
@@ -444,6 +533,22 @@ function focusEvent(event: ConflictEvent) {
   });
 }
 watch(() => props.events, updateData);
+watch([() => props.countryLayer, () => props.catalog], updateCountryLayers);
+watch(
+  () => props.profileCountry,
+  (code) => {
+    updateReferences();
+    const feature = boundaries.features.find(
+      (feature) => feature.properties.code === code,
+    );
+    if (feature)
+      map?.easeTo({
+        center: [feature.properties.x, feature.properties.y],
+        zoom: 2.8,
+        duration: reducedMotion() ? 0 : 700,
+      });
+  },
+);
 watch(
   () => props.selected,
   (id) => {
@@ -456,7 +561,13 @@ watch(
   () => props.heatmap,
   (visible) => {
     if (map?.getLayer("heat"))
-      map.setLayoutProperty("heat", "visibility", visible ? "visible" : "none");
+      map.setLayoutProperty(
+        "heat",
+        "visibility",
+        visible && (props.countryLayer ?? "events") === "events"
+          ? "visible"
+          : "none",
+      );
   },
 );
 watch(
@@ -467,6 +578,8 @@ watch(
       const response = await fetch("/data/countries.geojson");
       if (!response.ok) throw new Error("Country geometry unavailable");
       boundaries = await response.json();
+      for (const feature of boundaries.features)
+        feature.properties.code = countryGeometryCode(feature.properties.code);
       if (!element.isConnected) return;
       setWorkerUrl(workerUrl);
       map = new WorldMap({
@@ -509,31 +622,54 @@ watch(
         else reset();
         reportViewport();
       });
+      updateCountryLayers();
       map.on("moveend", reportViewport);
       for (const layer of [
         "reference-dots",
         "reference-counts",
-        "country-area",
+        "country-hit",
       ]) {
         map.on("click", layer, (event) => {
           const code = event.features?.[0]?.properties?.code;
-          if (code) emit("country", String(code));
+          if (code && props.catalog?.some((country) => country.code === code))
+            emit("country", String(code));
         });
         map.on("mouseenter", layer, (event) => {
           if (!map) return;
           map.getCanvas().style.cursor = "pointer";
           const code = event.features?.[0]?.properties?.code;
-          const item = countryReferences(props.events).find(
-            (item) => item.code === code,
+          const country = (props.catalog ?? []).find(
+            (country) => country.code === code,
           );
+          const reference = countryReferences(props.events).find(
+            (country) => country.code === code,
+          );
+          const item = country
+            ? { name: country.name, count: reference?.count ?? 0 }
+            : (reference ?? {
+                name: String(event.features?.[0]?.properties?.name ?? code),
+                count: 0,
+              });
           if (!item) return;
           const content = document.createElement("div");
           content.className = "map-hover-content";
           const strong = document.createElement("strong");
-          strong.textContent = `${item.name} · ${item.count} relatos com menção ao país`;
+          strong.textContent =
+            props.countryLayer === "stability"
+              ? country?.stability
+                ? item.name +
+                  " · " +
+                  country.stability.value.toFixed(1) +
+                  " / 100 · " +
+                  country.stability.year
+                : item.name + " · sem série recente"
+              : item.name + " · " + item.count + " relatos relacionados";
           const note = document.createElement("p");
-          note.textContent =
-            "Referência nacional. Não localiza ataques ou controle territorial. Clique para filtrar a cronologia.";
+          note.textContent = !country
+            ? "Esta área cartográfica não tem um perfil estatístico próprio disponível. Nenhuma pontuação nacional é atribuída."
+            : props.countryLayer === "stability"
+              ? "Estabilidade política anual · WGI / Banco Mundial. Não é um índice de crise em tempo real. Clique para abrir o perfil."
+              : "País citado no noticiário; não localiza ataques. Clique para abrir estatísticas, contexto e notícias.";
           content.append(strong);
           for (const report of props.events
             .filter((report) =>

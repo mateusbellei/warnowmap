@@ -12,7 +12,7 @@ const props = defineProps<{
   selected: string | null;
   basis: "event" | "collected";
   loading: boolean;
-  view?: "reports" | "groups";
+  view?: "reports" | "groups" | "stories";
 }>();
 defineEmits<{ select: [id: string] }>();
 const visible = ref(40);
@@ -53,7 +53,13 @@ const timeLabel = (date: string) =>
       </div>
       <span
         >{{ events.length }}
-        {{ view === "groups" ? "grupos" : "notícias" }}</span
+        {{
+          view === "stories"
+            ? "histórias"
+            : view === "groups"
+              ? "grupos"
+              : "notícias"
+        }}</span
       >
     </header>
     <p class="chronology-note">
@@ -98,7 +104,7 @@ const timeLabel = (date: string) =>
               @click="$emit('select', event.id)"
             >
               <div
-                v-if="view === 'groups' && (event.reportCount ?? 0) > 1"
+                v-if="view !== 'reports' && (event.reportCount ?? 0) > 1"
                 class="occurrence-badges"
               >
                 <span
@@ -141,6 +147,13 @@ const timeLabel = (date: string) =>
                 >
               </div>
               <h4>{{ event.title }}</h4>
+              <p
+                v-if="event.story && (event.reportCount ?? 0) > 1"
+                class="story-update"
+              >
+                {{ event.story.sourceCount }} veículos · última fonte
+                {{ timeLabel(event.story.updatedAt) }} UTC
+              </p>
               <div v-if="event.economy" class="timeline-economy">
                 <span class="economy-badge"
                   >$

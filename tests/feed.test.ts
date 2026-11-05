@@ -73,6 +73,11 @@ describe("API de relatos", () => {
     expect(reports.events.every((item) => item.reportCount === 1)).toBe(true);
     query = { ...query, view: "groups" };
     expect((await api({})).events).toHaveLength(1);
+    query = { ...query, view: "stories" };
+    const stories = await api({});
+    expect(stories.view).toBe("stories");
+    expect(stories.events).toHaveLength(1);
+    expect(stories.events[0]?.story?.sourceCount).toBe(1);
     query = { ...query, from: "2026-09-01", to: "2026-09-30" };
     expect((await api({})).events).toEqual([]);
     query = { ...query, from: "2026-10-01", to: "2026-10-29", view: "reports" };

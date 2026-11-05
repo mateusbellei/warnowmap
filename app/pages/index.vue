@@ -46,6 +46,8 @@ import {
   validPeriod,
   eventsInPeriod,
 } from "#shared/utils/period";
+import { changedStories, feedFingerprint } from "#shared/utils/stories";
+import type { CountryCatalog } from "#shared/types/country";
 const route = useRoute();
 const router = useRouter();
 const demo = ref(route.query.demo === "true");
@@ -88,11 +90,19 @@ const to = ref(
 );
 const rangeValid = computed(() => validPeriod(from.value, to.value));
 const cursor = ref(29);
-const resultView = ref<"reports" | "groups">(
-  route.query.view === "groups" ? "groups" : "reports",
+const resultView = ref<"reports" | "groups" | "stories">(
+  route.query.view === "reports"
+    ? "reports"
+    : route.query.view === "groups"
+      ? "groups"
+      : "stories",
 );
 const resultUnit = computed(() =>
-  resultView.value === "reports" ? "notícias" : "grupos",
+  resultView.value === "reports"
+    ? "notícias"
+    : resultView.value === "stories"
+      ? "histórias"
+      : "grupos",
 );
 const playing = ref(false);
 const paused = ref(false);
@@ -167,6 +177,87 @@ const {
   timeout: 65000,
   lazy: true,
   server: false,
+});
+const { data: countryCatalog } = await useFetch<CountryCatalog>(
+  "/api/countries",
+  { lazy: true },
+);
+const profileCountry = ref(
+  typeof route.query.profile === "string" ? route.query.profile : "",
+);
+const countryLayer = ref<"events" | "stability" | "activity">("events");
+const countryPanel = ref(false);
+function openCountry(code: string) {
+  profileCountry.value = code;
+  countryPanel.value = true;
+  selected.value = null;
+}
+const pendingFeed = shallowRef<EventFeed | null>(null);
+const polling = ref(false);
+const pollFailed = ref(false);
+let feedEpoch = 0;
+watch(
+  feed,
+  () => {
+    feedEpoch++;
+    pendingFeed.value = null;
+  },
+  { flush: "sync" },
+);
+const updateCount = computed(() =>
+  pendingFeed.value
+    ? changedStories(feed.value?.events ?? [], pendingFeed.value.events)
+    : 0,
+);
+function feedQuery() {
+  return {
+    demo: demo.value,
+    view: resultView.value,
+    from: rangeValid.value ? from.value : undefined,
+    to: rangeValid.value ? to.value : undefined,
+    basis: basis.value,
+    scope: interstateOnly.value
+      ? stateOnly.value
+        ? "state"
+        : "bilateral"
+      : "all",
+  };
+}
+async function pollUpdates() {
+  if (polling.value || !feed.value || status.value === "pending") return;
+  polling.value = true;
+  const query = feedQuery(),
+    key = JSON.stringify(query);
+  const epoch = feedEpoch;
+  try {
+    const next = await $fetch<EventFeed>("/api/events", {
+      query,
+      timeout: 65000,
+    });
+    if (JSON.stringify(feedQuery()) !== key || epoch !== feedEpoch) return;
+    pollFailed.value = false;
+    if (feedFingerprint(next.events) !== feedFingerprint(feed.value.events))
+      pendingFeed.value = next;
+    else {
+      feed.value = { ...next, events: feed.value.events };
+      pendingFeed.value = null;
+    }
+  } catch {
+    pollFailed.value = true;
+  } finally {
+    polling.value = false;
+  }
+}
+function applyUpdates() {
+  if (pendingFeed.value) {
+    feed.value = pendingFeed.value;
+    pendingFeed.value = null;
+  }
+}
+watch([from, to, basis, resultView, demo, interstateOnly, stateOnly], () => {
+  feedEpoch++;
+  pendingFeed.value = null;
+  pollFailed.value = false;
 });
 const loading = computed(
   () =>
@@ -359,6 +450,7 @@ function toggleConflictFocus() {
   mobileMap.value = true;
 }
 function choose(id: string) {
+  countryPanel.value = false;
   selected.value = selected.value === id ? null : id;
   if (selected.value) mobileMap.value = true;
 }
@@ -459,6 +551,8 @@ watch(
     to,
     basis,
     resultView,
+    profileCountry,
+    countryPanel,
   ],
   () => {
     router.replace({
@@ -467,6 +561,7 @@ watch(
         to: to.value,
         basis: basis.value,
         view: resultView.value,
+        profile: countryPanel.value ? profileCountry.value : undefined,
         q: search.value || undefined,
         country: country.value || undefined,
         pair: pair.value || undefined,
@@ -479,7 +574,18 @@ watch(
 );
 let poller: ReturnType<typeof setInterval>;
 let replay: ReturnType<typeof setInterval>;
+async function openMapView(value: boolean) {
+  mobileMap.value = value;
+  await nextTick();
+  document.querySelector(".diplomacy-layout")?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "instant"
+      : "smooth",
+    block: "start",
+  });
+}
 onMounted(() => {
+  if (/^[A-Z]{3}$/.test(profileCountry.value)) countryPanel.value = true;
   try {
     previousVisit.value = localStorage.getItem("warnow:last-visit");
     localStorage.setItem("warnow:last-visit", new Date().toISOString());
@@ -494,7 +600,7 @@ onMounted(() => {
       !document.hidden &&
       status.value !== "pending"
     )
-      refresh();
+      pollUpdates();
   }, 60000);
   replay = setInterval(() => {
     if (!playing.value || document.hidden) return;
@@ -522,14 +628,14 @@ onBeforeUnmount(() => {
         class="rail-button current"
         aria-label="Ver linha do tempo"
         title="Linha do tempo"
-        @click="mobileMap = false"
+        @click="openMapView(false)"
       >
         <History :size="21" /></button
       ><button
         class="rail-button"
         aria-label="Ver mapa"
         title="Mapa"
-        @click="mobileMap = true"
+        @click="openMapView(true)"
       >
         <Globe2 :size="21" /></button
       ><button
@@ -557,9 +663,9 @@ onBeforeUnmount(() => {
           ><small>CONFLICT & DIPLOMACY MONITOR</small></a
         >
         <nav class="header-nav" aria-label="Visualizações">
-          <button :class="{ active: !mobileMap }" @click="mobileMap = false">
+          <button :class="{ active: !mobileMap }" @click="openMapView(false)">
             <History :size="15" /> Linha do tempo</button
-          ><button :class="{ active: mobileMap }" @click="mobileMap = true">
+          ><button :class="{ active: mobileMap }" @click="openMapView(true)">
             <Globe2 :size="15" /> Mapa global
           </button>
         </nav>
@@ -649,6 +755,24 @@ onBeforeUnmount(() => {
             {{ relation.label }} <small>{{ relation.count }}</small>
           </button>
         </section>
+        <CountryExplorer
+          :catalog="countryCatalog ?? null"
+          :events="feed?.events ?? []"
+          :mode="feed?.mode ?? 'unavailable'"
+          :profile-country="profileCountry"
+          :open="countryPanel"
+          :from="from"
+          :to="to"
+          :basis="basis"
+          @select="openCountry"
+          @close="countryPanel = false"
+          @filter="
+            country = $event;
+            pair = '';
+            countryPanel = false;
+            mobileMap = false;
+          "
+        />
         <section
           class="monitor diplomacy-monitor"
           aria-label="Monitor de confrontos e diplomacia"
@@ -828,10 +952,29 @@ onBeforeUnmount(() => {
               </template>
             </p>
           </section>
+          <div v-if="pendingFeed" class="updates-banner" role="status">
+            <span>{{
+              updateCount
+                ? updateCount + " histórias novas ou atualizadas"
+                : "O recorte do feed foi atualizado"
+            }}</span
+            ><button @click="applyUpdates">Ver atualizações</button
+            ><small>Sua leitura permanece no lugar até aplicar.</small>
+          </div>
+          <p v-if="pollFailed" class="poll-note" role="status">
+            A atualização automática falhou; o último recorte continua
+            disponível.
+          </p>
           <section
             class="results-view"
             aria-label="Apresentação dos resultados"
           >
+            <button
+              :aria-pressed="resultView === 'stories'"
+              @click="resultView = 'stories'"
+            >
+              Histórias e atualizações
+            </button>
             <button
               :aria-pressed="resultView === 'reports'"
               @click="resultView = 'reports'"
@@ -1032,11 +1175,10 @@ onBeforeUnmount(() => {
                   :events="events"
                   :selected="selected"
                   :heatmap="heatmap"
-                  @country="
-                    country = $event;
-                    pair = '';
-                    mobileMap = false;
-                  "
+                  :country-layer="countryLayer"
+                  :catalog="countryCatalog?.countries ?? []"
+                  :profile-country="countryPanel ? profileCountry : ''"
+                  @country="openCountry"
                   @select="choose"
                   @viewport="mapBounds = $event"
                 /><template #fallback
@@ -1046,9 +1188,31 @@ onBeforeUnmount(() => {
                 ></ClientOnly
               >
               <div class="map-topline">
+                <button
+                  class="country-open-control"
+                  @click="openCountry(profileCountry || country || 'BRA')"
+                >
+                  Explorar país <Globe2 :size="13" />
+                </button>
+                <label class="map-layer-control"
+                  >Camada<select
+                    v-model="countryLayer"
+                    aria-label="Camada do mapa"
+                  >
+                    <option value="events">Acontecimentos</option>
+                    <option value="stability">
+                      Estabilidade política · anual
+                    </option>
+                    <option value="activity">Atividade no noticiário</option>
+                  </select></label
+                >
                 <span
-                  ><Globe2 :size="13" />MAPA GLOBAL · {{ events.length }}
-                  {{ resultUnit.toUpperCase() }}</span
+                  ><Globe2 :size="13" />MAPA GLOBAL ·
+                  {{
+                    countryLayer === "stability"
+                      ? "ESTABILIDADE POLÍTICA · ANUAL"
+                      : events.length + " " + resultUnit.toUpperCase()
+                  }}</span
                 >
                 <button
                   class="area-filter"
@@ -1072,15 +1236,42 @@ onBeforeUnmount(() => {
                 </button>
               </div>
               <div class="map-coordinate">
-                {{ cutoff ? `ATÉ ${cutoff}` : "SEM RECORTE" }}
+                {{
+                  countryLayer === "stability"
+                    ? "WGI · SÉRIE ANUAL"
+                    : cutoff
+                      ? `ATÉ ${cutoff}`
+                      : "SEM RECORTE"
+                }}
                 <span>•</span> WGS 84
               </div>
-              <div class="map-reading-note">
+              <div v-if="countryLayer !== 'events'" class="country-map-legend">
+                <template v-if="countryLayer === 'stability'"
+                  ><strong>Estabilidade política · Banco Mundial</strong
+                  ><span
+                    ><i style="background: #d86d70" /> Menor
+                    <i style="background: #e2c477" /> Intermediária
+                    <i style="background: #75c6b0" /> Maior
+                    <i style="background: #596771" /> Sem série recente</span
+                  ><small
+                    >Estimativa anual (0–100), não mede instabilidade em tempo
+                    real. Clique no país para ver ano e série.</small
+                  ></template
+                ><template v-else
+                  ><strong>Atividade no noticiário</strong
+                  ><small
+                    >Cor mais intensa indica mais histórias relacionadas ao país
+                    no recorte. Não mede violência nem identifica local de
+                    ataque.</small
+                  ></template
+                >
+              </div>
+              <div v-if="countryLayer === 'events'" class="map-reading-note">
                 Áreas azuis: países citados · contadores: relatos · pontos:
                 coordenadas extraídas, sem confirmação de ataque · contagens por
                 país não são somáveis · dourado: economia
               </div>
-              <div class="map-legend">
+              <div v-if="countryLayer === 'events'" class="map-legend">
                 <span><i class="armed" />Confronto</span
                 ><span><i class="diplomacy" />Diplomacia</span
                 ><span><i class="tension" />Tensão</span
@@ -1257,7 +1448,7 @@ onBeforeUnmount(() => {
             Fontes e metodologia <ArrowUpRight :size="12" />
           </button>
         </footer>
-        <button class="mobile-feed-toggle" @click="mobileMap = !mobileMap">
+        <button class="mobile-feed-toggle" @click="openMapView(!mobileMap)">
           <History v-if="mobileMap" :size="16" /><MapIcon v-else :size="16" />{{
             mobileMap ? "Ver linha do tempo" : "Ver mapa do período"
           }}
