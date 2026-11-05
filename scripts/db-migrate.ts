@@ -6,7 +6,7 @@ if (!repository)
   );
 try {
   await repository.migrate();
-  console.info(`Migração 1 aplicada (${repository.kind}).`);
+  console.info(`Migrações aplicadas (${repository.kind}).`);
 } finally {
   await repository.close();
 }

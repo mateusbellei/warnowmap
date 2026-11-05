@@ -44,7 +44,9 @@ const date = (value: string) =>
         {{
           event.groupingBasis === "matching-headline"
             ? "Manchetes equivalentes agrupadas automaticamente. Republicações não comprovam confirmação por fontes independentes."
-            : "URLs da mesma matéria ou acompanhamento agrupadas. A manchete geral de um liveblog não descreve cada atualização individual."
+            : event.groupingBasis === "related-coverage"
+              ? "Cobertura com manchetes muito próximas, mesmos países, categoria, data e números. O vínculo é editorial e não confirma que seja o mesmo incidente."
+              : "URLs da mesma matéria ou acompanhamento agrupadas. A manchete geral de um liveblog não descreve cada atualização individual."
         }}
       </p>
       <ol class="source-reports">

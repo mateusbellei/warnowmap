@@ -10,6 +10,7 @@ export default defineNuxtConfig({
     "~/assets/css/quality.css",
     "~/assets/css/monitor.css",
     "~/assets/css/reading.css",
+    "~/assets/css/intelligence.css",
   ],
   typescript: { strict: true },
   runtimeConfig: { gdeltEnabled: true },

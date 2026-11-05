@@ -8,6 +8,7 @@ import {
 import { eventsInPeriod, validPeriod } from "../../shared/utils/period";
 import { collectFeed } from "../services/collector";
 import { configuredRepository } from "../services/ingestion";
+import { groupStories } from "../../shared/utils/stories";
 let pending: Promise<EventFeed> | undefined;
 let cached: { expires: number; feed: EventFeed } | undefined;
 
@@ -15,7 +16,12 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
   setHeader(event, "Cache-Control", "no-store");
   const scope = getQuery(event).scope;
   const query = getQuery(event);
-  const view = query.view === "reports" ? "reports" : "groups";
+  const view =
+    query.view === "stories"
+      ? "stories"
+      : query.view === "reports"
+        ? "reports"
+        : "groups";
   const from = typeof query.from === "string" ? query.from : "";
   const to = typeof query.to === "string" ? query.to : "";
   if ((from || to) && !validPeriod(from, to))
@@ -46,7 +52,9 @@ export default defineEventHandler(async (event): Promise<EventFeed> => {
         ? periodReports
         : view === "reports"
           ? presentPublications(periodReports)
-          : groupOccurrences(periodReports);
+          : view === "stories"
+            ? groupStories(periodReports)
+            : groupOccurrences(periodReports);
     return {
       ...feed,
       pipelineVersion: "monitor-v1",

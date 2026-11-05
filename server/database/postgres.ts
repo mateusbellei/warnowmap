@@ -3,6 +3,11 @@ import type { EventFeed } from "../../shared/types/conflict";
 import { selectEditorial } from "../utils/editorial";
 import type { FeedRepository, IngestionRun } from "./repository";
 import { postgresSchema } from "./schema";
+import { observeCountries } from "../../shared/utils/country";
+import type {
+  CountryDataset,
+  CountryObservation,
+} from "../../shared/types/country";
 
 export function postgresRepository(url: string): FeedRepository {
   // sslmode do provedor é respeitado; não desabilitamos validação de certificados.
@@ -28,6 +33,19 @@ export function postgresRepository(url: string): FeedRepository {
         await sql`SELECT payload FROM warnow_snapshots WHERE id='current'`;
       return (rows[0]?.payload as EventFeed) ?? null;
     },
+    async loadCountryDataset() {
+      const rows =
+        await sql`SELECT payload FROM warnow_snapshots WHERE id='country-statistics'`;
+      return (rows[0]?.payload as CountryDataset) ?? null;
+    },
+    async saveCountryDataset(dataset) {
+      await sql`INSERT INTO warnow_snapshots VALUES ('country-statistics',${sql.json(dataset as unknown as postgres.JSONValue)},now()) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at`;
+    },
+    async countryHistory(code) {
+      const rows =
+        await sql`SELECT payload FROM warnow_country_observations WHERE country_code=${code} ORDER BY day DESC LIMIT 90`;
+      return rows.map((row) => row.payload as CountryObservation).reverse();
+    },
     async commit(feed, run, holder) {
       const reports = selectEditorial(feed.events).events.map((event) => ({
         id: event.id,
@@ -47,6 +65,16 @@ export function postgresRepository(url: string): FeedRepository {
           await tx`INSERT INTO warnow_reports SELECT id,url,indexed_at,payload FROM jsonb_to_recordset(${sql.json(reports as unknown as postgres.JSONValue)}) AS x(id text,url text,indexed_at timestamptz,payload jsonb) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,indexed_at=excluded.indexed_at`;
         await tx`DELETE FROM warnow_reports WHERE indexed_at < ${cutoff}`;
         await tx`DELETE FROM warnow_runs WHERE ended_at < ${cutoff}`;
+        const observations = observeCountries(feed, run.endedAt).map(
+          (observation) => ({
+            country_code: observation.code,
+            day: observation.day,
+            payload: observation,
+          }),
+        );
+        if (observations.length)
+          await tx`INSERT INTO warnow_country_observations SELECT country_code,day,payload FROM jsonb_to_recordset(${sql.json(observations as unknown as postgres.JSONValue)}) AS x(country_code text,day text,payload jsonb) ON CONFLICT(country_code,day) DO UPDATE SET payload=excluded.payload`;
+        await tx`DELETE FROM warnow_country_observations WHERE day < ${new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10)}`;
         await tx`INSERT INTO warnow_runs VALUES (${run.id},${run.startedAt},${run.endedAt},${run.status},${run.reports},${run.errorCode ?? null}) ON CONFLICT(id) DO UPDATE SET ended_at=excluded.ended_at,status=excluded.status,reports=excluded.reports,error_code=excluded.error_code`;
       });
     },
