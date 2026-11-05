@@ -1,0 +1,26 @@
+name: Country statistics
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 * * 1"
+permissions:
+  contents: read
+concurrency:
+  group: warnow-country-statistics
+  cancel-in-progress: false
+jobs:
+  refresh:
+    if: vars.WARNOW_STATS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Refresh official country statistics
+        env:
+          STATS_URL: ${{ vars.WARNOW_STATS_URL }}
+          INGEST_SECRET: ${{ secrets.WARNOW_INGEST_SECRET }}
+        shell: bash
+        run: |
+          test -n "$STATS_URL" && test ${#INGEST_SECRET} -ge 32
+          case "$STATS_URL" in https://*/api/admin/countries) ;; *) echo "Invalid statistics URL"; exit 1;; esac
+          curl --fail --silent --show-error --max-time 58 --request POST \
+            --header "Authorization: Bearer $INGEST_SECRET" "$STATS_URL"

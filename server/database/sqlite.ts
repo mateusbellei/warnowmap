@@ -5,6 +5,11 @@ import type { EventFeed } from "../../shared/types/conflict";
 import { selectEditorial } from "../utils/editorial";
 import type { FeedRepository, IngestionRun } from "./repository";
 import { sqliteSchema } from "./schema";
+import { observeCountries } from "../../shared/utils/country";
+import type {
+  CountryDataset,
+  CountryObservation,
+} from "../../shared/types/country";
 
 export async function sqliteRepository(path: string): Promise<FeedRepository> {
   if (path !== ":memory:") await mkdir(dirname(path), { recursive: true });
@@ -30,6 +35,30 @@ export async function sqliteRepository(path: string): Promise<FeedRepository> {
         .prepare("SELECT payload FROM warnow_snapshots WHERE id='current'")
         .get() as { payload: string } | undefined;
       return row ? (JSON.parse(row.payload) as EventFeed) : null;
+    },
+    async loadCountryDataset() {
+      const row = db
+        .prepare(
+          "SELECT payload FROM warnow_snapshots WHERE id='country-statistics'",
+        )
+        .get() as { payload: string } | undefined;
+      return row ? (JSON.parse(row.payload) as CountryDataset) : null;
+    },
+    async saveCountryDataset(dataset) {
+      db.prepare(
+        "INSERT INTO warnow_snapshots VALUES ('country-statistics',?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at",
+      ).run(JSON.stringify(dataset), dataset.retrievedAt);
+    },
+    async countryHistory(code) {
+      return (
+        db
+          .prepare(
+            "SELECT payload FROM warnow_country_observations WHERE country_code=? ORDER BY day DESC LIMIT 90",
+          )
+          .all(code) as { payload: string }[]
+      )
+        .map((row) => JSON.parse(row.payload) as CountryObservation)
+        .reverse();
     },
     async commit(feed, run, holder) {
       db.exec("BEGIN IMMEDIATE");
@@ -59,6 +88,13 @@ export async function sqliteRepository(path: string): Promise<FeedRepository> {
           cutoff,
         );
         db.prepare("DELETE FROM warnow_runs WHERE ended_at < ?").run(cutoff);
+        for (const observation of observeCountries(feed, run.endedAt))
+          db.prepare(
+            "INSERT INTO warnow_country_observations VALUES (?,?,?) ON CONFLICT(country_code,day) DO UPDATE SET payload=excluded.payload",
+          ).run(observation.code, observation.day, JSON.stringify(observation));
+        db.prepare("DELETE FROM warnow_country_observations WHERE day < ?").run(
+          new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10),
+        );
         record(run);
         db.exec("COMMIT");
       } catch (error) {

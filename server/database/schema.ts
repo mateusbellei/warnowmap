@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS warnow_reports (id text PRIMARY KEY, url text NOT NUL
 CREATE INDEX IF NOT EXISTS warnow_reports_indexed ON warnow_reports(indexed_at);
 CREATE TABLE IF NOT EXISTS warnow_leases (id text PRIMARY KEY, holder text NOT NULL, expires_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS warnow_runs (id text PRIMARY KEY, started_at timestamptz NOT NULL, ended_at timestamptz NOT NULL, status text NOT NULL, reports integer NOT NULL, error_code text);
+CREATE TABLE IF NOT EXISTS warnow_country_observations (country_code text NOT NULL, day text NOT NULL, payload jsonb NOT NULL, PRIMARY KEY(country_code,day));
+INSERT INTO warnow_migrations(version) VALUES (2) ON CONFLICT DO NOTHING;
 INSERT INTO warnow_migrations(version) VALUES (1) ON CONFLICT DO NOTHING;
 `;
 export const sqliteSchema = `
@@ -16,5 +18,7 @@ CREATE TABLE IF NOT EXISTS warnow_reports (id TEXT PRIMARY KEY, url TEXT NOT NUL
 CREATE INDEX IF NOT EXISTS warnow_reports_indexed ON warnow_reports(indexed_at);
 CREATE TABLE IF NOT EXISTS warnow_leases (id TEXT PRIMARY KEY, holder TEXT NOT NULL, expires_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS warnow_runs (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, ended_at TEXT NOT NULL, status TEXT NOT NULL, reports INTEGER NOT NULL, error_code TEXT);
+CREATE TABLE IF NOT EXISTS warnow_country_observations (country_code TEXT NOT NULL, day TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(country_code,day));
+INSERT OR IGNORE INTO warnow_migrations(version) VALUES (2);
 INSERT OR IGNORE INTO warnow_migrations(version) VALUES (1);
 `;

@@ -23,9 +23,10 @@ export interface CountryRef {
   name: string;
 }
 export interface ConflictEvent {
+  story?: { updatedAt: string; sourceCount: number };
   reports?: SourceReport[];
   reportCount?: number;
-  groupingBasis?: "canonical-url" | "matching-headline";
+  groupingBasis?: "canonical-url" | "matching-headline" | "related-coverage";
   firstSeenAt?: string;
   lastSeenAt?: string;
   dossier?: { id: string; label: string; basis: "mentioned-countries" };
@@ -100,7 +101,7 @@ export interface EconomicImpact {
   context: string;
 }
 export interface EventFeed {
-  view?: "reports" | "groups";
+  view?: "reports" | "groups" | "stories";
   pipelineVersion?: "news-v2" | "news-v3" | "monitor-v1";
   summary?: {
     reports: number;

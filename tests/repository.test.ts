@@ -62,6 +62,25 @@ export async function repositoryContract(repo: FeedRepository) {
   expect(await repo.load()).toBeNull();
   await repo.commit(feed, run, "worker-a");
   await repo.commit(feed, run, "worker-a");
+  const statistics: import("../shared/types/country").CountryDataset = {
+    version: 1,
+    retrievedAt: now,
+    sourceUpdatedAt: now.slice(0, 10),
+    countries: [
+      {
+        code: "BRA",
+        alpha2: "BR",
+        name: "Brasil",
+        metrics: [{ key: "population", points: [{ year: 2025, value: 123 }] }],
+      },
+    ],
+  };
+  await repo.saveCountryDataset(statistics);
+  expect(await repo.loadCountryDataset()).toEqual(statistics);
+  const observations = await repo.countryHistory("UKR");
+  expect(observations).toHaveLength(1);
+  expect(observations[0]?.methodology).toBe("news-observation-v1");
+  expect(observations[0]?.coverage).toBe(0);
   expect((await repo.health()).reports).toBe(1);
   expect((await repo.load())?.events[0]?.countries).toEqual(
     feed.events[0]?.countries,
