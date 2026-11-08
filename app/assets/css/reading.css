@@ -344,3 +344,53 @@
     font-size: 16px;
   }
 }
+.evidence-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #a9cbd8;
+  margin: 6px 0 10px;
+}
+.evidence-facts {
+  display: grid;
+  gap: 0;
+  margin: 18px 0 24px;
+  border: 1px solid #49616c;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.map-first-shell .readable-detail .evidence-facts > div {
+  padding: 13px 15px;
+  background: #1b303a;
+}
+.evidence-facts > div + div {
+  border-top: 1px solid #3c5560;
+}
+.map-first-shell .readable-detail .evidence-facts dt {
+  font-size: 12px;
+  color: #adcedb;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.map-first-shell .readable-detail .evidence-facts dd {
+  margin: 0;
+  color: #f1f6f8;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.evidence-facts dd small {
+  display: block;
+  color: #c6dbe3;
+  font-size: 12px;
+}
+.evidence-facts a {
+  color: #ffb18f;
+  text-decoration: underline;
+}
+.reading-metadata p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #cadbe2;
+}

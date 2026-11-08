@@ -912,3 +912,104 @@
     order: 6;
   }
 }
+.military-profile h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.military-card strong {
+  font-size: 24px;
+  line-height: 1.3;
+}
+.military-card p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #c5d5dc;
+  margin: 12px 0;
+}
+.military-card details {
+  margin: 12px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #bfd3dc;
+}
+.military-card summary {
+  cursor: pointer;
+}
+.military-card a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.military-notice {
+  padding: 12px 14px;
+  background: #3b3022;
+  border-left: 3px solid #e8bc78;
+  color: #f4dfbb;
+  line-height: 1.6;
+}
+.feed-coverage-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 26px;
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  background: #17262c;
+  border: 1px solid #48626c;
+  border-radius: 8px;
+  color: #edf5f7;
+}
+.feed-coverage-card.warning {
+  border-color: #a58a57;
+  background: #282820;
+}
+.coverage-primary,
+.coverage-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1 1 300px;
+}
+.coverage-primary svg,
+.coverage-summary svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: #e6c589;
+}
+.feed-coverage-card strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.feed-coverage-card span {
+  display: block;
+  margin-top: 4px;
+  color: #d0dde0;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.feed-coverage-card details {
+  flex-basis: 100%;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.feed-coverage-card summary {
+  cursor: pointer;
+  color: #d9e8eb;
+  width: fit-content;
+}
+.feed-coverage-card p {
+  max-width: 950px;
+  color: #d0dde0;
+  margin: 10px 0 0;
+}
+@media (max-width: 600px) {
+  .feed-coverage-card {
+    padding: 14px;
+    margin-bottom: 14px;
+    gap: 14px;
+  }
+  .military-card strong {
+    font-size: 21px;
+  }
+}

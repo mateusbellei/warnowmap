@@ -48,6 +48,7 @@ import {
 } from "#shared/utils/period";
 import { changedStories, feedFingerprint } from "#shared/utils/stories";
 import type { CountryCatalog } from "#shared/types/country";
+import { feedCoverage } from "#shared/utils/coverage";
 const route = useRoute();
 const router = useRouter();
 const demo = ref(route.query.demo === "true");
@@ -407,18 +408,18 @@ const counts = computed(() => ({
   tension: events.value.filter((e) => e.kind === "tension").length,
   pairs: new Set(events.value.map((e) => e.countryPair).filter(Boolean)).size,
 }));
-const modeLabel = computed(() =>
-  !feed.value
-    ? "Aguardando coleta"
-    : feed.value.coverage?.contextStatus === "partial"
-      ? "Coleta incompleta"
-      : {
-          live: "Feed conectado",
-          stale: "Dados desatualizados",
-          demo: "Demonstração",
-          unavailable: "Feed indisponível",
-        }[feed.value?.mode ?? "unavailable"],
+const collectionStatus = computed(() =>
+  feedCoverage(feed.value, from.value, to.value, now.value),
 );
+const modeLabel = computed(() => {
+  const info = collectionStatus.value;
+  if (!feed.value) return "Aguardando coleta";
+  if (info.state === "demo") return "Demonstração";
+  if (info.state === "unavailable") return "Feed indisponível";
+  if (info.state === "stale") return "Coleta desatualizada";
+  if (info.state === "unknown") return "Coleta sem horário confirmado";
+  return info.partial ? "Coleta recente · cobertura parcial" : "Coleta recente";
+});
 function formatDate(value: string, time = false) {
   return (
     new Intl.DateTimeFormat("pt-BR", {
@@ -670,7 +671,15 @@ onBeforeUnmount(() => {
           </button>
         </nav>
         <div class="topbar-right">
-          <span class="connection" :class="feed?.mode"
+          <span
+            class="connection"
+            :class="
+              collectionStatus.state === 'recent' && !collectionStatus.partial
+                ? 'live'
+                : feed?.mode === 'demo'
+                  ? 'demo'
+                  : 'stale'
+            "
             ><i />{{ loading ? "Consultando feed" : modeLabel }}</span
           >
         </div>
@@ -697,6 +706,14 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </section>
+        <FeedCoverage
+          :feed="feed ?? null"
+          :from="from"
+          :to="to"
+          :now="now"
+          :loading="loading"
+          :failed="pollFailed"
+        />
         <section class="stats-grid" aria-label="Resumo do recorte temporal">
           <article>
             <div class="stat-icon coral"><Crosshair :size="20" /></div>

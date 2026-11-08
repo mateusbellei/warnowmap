@@ -23,6 +23,12 @@ import type { FeatureCollection, Geometry } from "geojson";
 
 import type { CountryCatalogItem } from "#shared/types/country";
 import { stabilityColor } from "#shared/utils/country";
+import {
+  evidenceDate,
+  evidenceDateLabel,
+  evidencePlace,
+  sourceEvidence,
+} from "#shared/utils/evidence";
 const props = defineProps<{
   events: ConflictEvent[];
   selected: string | null;
@@ -678,8 +684,11 @@ watch(
             .slice(0, 2)) {
             const headline = document.createElement("p");
             headline.className = "hover-headline";
-            headline.textContent = report.title;
+            headline.textContent = sourceEvidence(report);
             content.append(headline);
+            const byline = document.createElement("small");
+            byline.textContent = `${report.source} · ${evidenceDate(report)} · ${evidenceDateLabel(report)}`;
+            content.append(byline);
           }
           content.append(note);
           popup?.remove();
@@ -742,17 +751,16 @@ watch(
             content.append(economic);
           } else {
             const item = eventIndex.value.get(String(feature.properties?.id));
-            heading.textContent = item?.title || "Relato";
+            heading.textContent = item ? sourceEvidence(item) : "Relato";
             const line = document.createElement("p");
-            line.textContent = item?.countries.length
-              ? `${item.countryBasis === "headline" ? "Citados na manchete" : "Afiliações dos atores"}: ${item.countries.map((country) => country.name).join(" · ")}`
-              : "Afiliações nacionais não identificadas";
+            line.textContent = item
+              ? evidencePlace(item)
+              : "Local não identificado";
             content.append(line);
-            if (item?.locationPrecision === "country") {
-              const geography = document.createElement("p");
-              geography.textContent =
-                "Referência ao país; não é a posição exata de um ataque.";
-              content.append(geography);
+            if (item) {
+              const byline = document.createElement("small");
+              byline.textContent = `${item.source} · ${evidenceDate(item)} · ${evidenceDateLabel(item)}`;
+              content.append(byline);
             }
             if (item?.economy) {
               const economic = document.createElement("p");

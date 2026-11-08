@@ -388,6 +388,7 @@ onBeforeUnmount(() => {
               { key: 'overview', label: 'Visão geral' },
               { key: 'activity', label: 'Situação recente' },
               { key: 'economy', label: 'Economia' },
+              { key: 'military', label: 'Exército' },
               { key: 'news', label: 'Notícias' },
               { key: 'compare', label: 'Comparar' },
             ]"
@@ -568,6 +569,7 @@ onBeforeUnmount(() => {
                   /></a>
                 </article></div
             ></template>
+            <MilitaryProfile v-if="tab === 'military'" :code="profileCountry" />
             <template v-if="tab === 'activity'"
               ><section class="country-section">
                 <h3>Instabilidade recente: evidências primeiro</h3>
@@ -775,7 +777,7 @@ onBeforeUnmount(() => {
                 </tbody>
               </table></template
             >
-            <footer class="country-data-source">
+            <footer v-if="tab !== 'military'" class="country-data-source">
               <a
                 href="https://www.worldbank.org/en/publication/worldwide-governance-indicators"
                 target="_blank"
