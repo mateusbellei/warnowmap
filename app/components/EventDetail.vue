@@ -7,6 +7,11 @@ import {
 } from "#shared/types/conflict";
 import { readingContext } from "#shared/utils/reading";
 import { economicSectors, economicStageLabels } from "#shared/utils/economy";
+import {
+  sourceEvidence,
+  evidencePlace,
+  evidenceDateLabel,
+} from "#shared/utils/evidence";
 defineProps<{ event: ConflictEvent }>();
 defineEmits<{ close: [] }>();
 const date = (value: string) =>
@@ -33,25 +38,40 @@ const date = (value: string) =>
       <p class="reading-countries">
         {{ event.countries.map((country) => country.name).join(" · ") }}
       </p>
-      <h2>{{ event.title }}</h2>
+      <span class="evidence-label"
+        >O que ocorreu ·
+        {{ event.demo ? "demonstração" : "manchete da fonte" }}</span
+      >
+      <h2>{{ sourceEvidence(event) }}</h2>
       <p class="reading-byline">
         {{ event.source }} · {{ date(event.eventDate)
         }}<span v-if="event.demo"> · Demonstração</span>
       </p>
-      <p v-if="event.situation" class="reading-status">
-        {{ situationLabels[event.situation] }}
-      </p>
-      <section class="reading-context" aria-label="Contexto da classificação">
-        <h3>Contexto de leitura</h3>
-        <p>{{ readingContext(event) }}</p>
-        <p v-if="event.selection?.reasons.length">
-          {{ event.selection.reasons.join(" ") }}
-        </p>
-        <small
-          >Classificação automática; não é um resumo do artigo nem confirmação
-          editorial. Países citados não definem agressor ou alvo.</small
-        >
-      </section>
+      <dl class="evidence-facts">
+        <div>
+          <dt>Onde</dt>
+          <dd>{{ evidencePlace(event) }}</dd>
+        </div>
+        <div>
+          <dt>Quando</dt>
+          <dd>
+            {{ date(event.eventDate)
+            }}<small>{{ evidenceDateLabel(event) }}</small>
+          </dd>
+        </div>
+        <div>
+          <dt>Segundo qual fonte</dt>
+          <dd>
+            <a
+              v-if="!event.demo"
+              :href="event.sourceUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ event.source }} ↗</a
+            ><span v-else>Demonstração</span>
+          </dd>
+        </div>
+      </dl>
       <section v-if="event.economy" class="reading-context">
         <h3>
           {{ economicSectors[event.economy.sector] }} ·
@@ -63,14 +83,21 @@ const date = (value: string) =>
           }}
         </h3>
         <p>{{ event.economy.label }}</p>
-        <p>{{ event.economy.context }}</p>
-        <blockquote v-if="event.economy.evidence">
-          {{ event.economy.evidence }}
-        </blockquote>
       </section>
       <OccurrenceContext v-if="(event.reportCount ?? 0) > 1" :event="event" />
       <details class="reading-metadata">
-        <summary>Localização, datas e critérios</summary>
+        <summary>Como este relato foi classificado</summary>
+        <p>{{ readingContext(event) }}</p>
+        <p v-if="event.situation">{{ situationLabels[event.situation] }}</p>
+        <p v-if="event.selection?.reasons.length">
+          {{ event.selection.reasons.join(" ") }}
+        </p>
+        <p v-if="event.economy">{{ event.economy.context }}</p>
+        <p>
+          Classificação automática, sem revisão editorial. A manchete é a
+          evidência disponível, não um resumo do artigo. Países citados não
+          definem agressor ou alvo.
+        </p>
         <dl>
           <div>
             <dt>Referência geográfica</dt>
