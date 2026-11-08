@@ -1,12 +1,16 @@
 # WarNow
 
-Monitor global de **confrontos e diplomacia entre países**, com Nuxt 4, TypeScript, Nitro e MapLibre GL JS. O mapa é a visualização principal, com símbolos por categoria, agrupamentos proporcionais e linha do tempo sincronizada. Interface em português. A interface apresenta notícias individuais por padrão, permite agrupar publicações relacionadas, distingue referências nacionais de coordenadas extraídas e prepara ingestão persistente fora das requisições do mapa. Veja [VERSAO-1.md](docs/VERSAO-1.md) e [OPERACAO.md](docs/OPERACAO.md).
+Monitor global de **confrontos e diplomacia entre países**, com Nuxt 4, TypeScript, Nitro e MapLibre GL JS. O mapa é a visualização principal, com símbolos por categoria, agrupamentos proporcionais e linha do tempo sincronizada. Interface em português. A interface apresenta histórias por padrão, preserva as publicações individuais, distingue referências nacionais de coordenadas extraídas e prepara ingestão persistente fora das requisições do mapa. Veja [VERSAO-1.md](docs/VERSAO-1.md) e [OPERACAO.md](docs/OPERACAO.md).
 
 A camada **Economia** resume sanções, comércio, ajuda econômica e rotas/logística. Um filtro destaca os relatos relacionados no mapa e na cronologia, separando medidas relatadas de ameaças ou intenções. Não estima perdas nem preços. Veja o escopo e a metodologia em [ECONOMIA.md](ECONOMIA.md).
 
 ## Inteligência por país (1.2)
 
 Perfis nacionais reúnem séries oficiais do Banco Mundial, comparação entre dois países e acompanhamento local de favoritos. O mapa alterna entre acontecimentos, estabilidade política anual e atividade no noticiário. Notícias podem ser lidas por histórias com publicações relacionadas; novidades automáticas aguardam aplicação pelo leitor. Consulte [INTELIGENCIA-PAISES.md](docs/INTELIGENCIA-PAISES.md) para metodologia, atualização e limites. O índice dinâmico de instabilidade depende de histórico contínuo e fontes operacionais adicionais.
+
+## Inventários, leitura e cobertura (1.3)
+
+A aba Exército reúne cinco categorias do inventário anual Global Firepower para 145 países, com fonte e edição. Drones e países sem cobertura ficam explicitamente sem dados. A primeira consulta após sete dias tenta atualizar o cache, preservando os últimos dados em falhas; `npm run military:refresh` atualiza o snapshot do próximo build. Detalhes de relatos priorizam a evidência coletada, local, data e fonte, com metodologia expansível. O cartão de coleta informa último sucesso, idade e lacunas do período. Consulte [INVENTARIOS-E-COBERTURA.md](docs/INVENTARIOS-E-COBERTURA.md).
 
 ## Executar
 
