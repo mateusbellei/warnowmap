@@ -1,7 +1,7 @@
 {
   "name": "warnowmap",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "scripts": {
     "dev": "nuxt dev --host 127.0.0.1",
@@ -15,7 +15,8 @@
     "format": "prettier --write app server shared tests docs README.md nuxt.config.ts vitest.config.ts",
     "format:check": "prettier --check app server shared tests docs README.md nuxt.config.ts vitest.config.ts",
     "check": "npm run typecheck && npm test && npm run build",
-    "stats:refresh": "tsx --env-file-if-exists=.env scripts/refresh-countries.ts"
+    "stats:refresh": "tsx --env-file-if-exists=.env scripts/refresh-countries.ts",
+    "military:refresh": "tsx scripts/refresh-military.ts"
   },
   "dependencies": {
     "@lucide/vue": "1.63.0",
