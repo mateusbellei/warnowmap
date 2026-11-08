@@ -201,6 +201,7 @@ watch(
   feed,
   () => {
     feedEpoch++;
+    now.value = Date.now();
     pendingFeed.value = null;
   },
   { flush: "sync" },
