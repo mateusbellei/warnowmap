@@ -75,6 +75,34 @@ describe("inventários militares", () => {
   });
 });
 describe("evidência e cobertura", () => {
+  it("aceita pequenos desvios no horário da coleta sem incluir lotes futuros", () => {
+    const feed = {
+      mode: "live",
+      fetchedAt: "2026-11-08T12:00:20Z",
+      coverage: { contextBatchDates: ["2026-11-08T12:15:00Z"] },
+    } as EventFeed;
+    expect(
+      feedCoverage(
+        feed,
+        "2026-11-08",
+        "2026-11-08",
+        Date.parse("2026-11-08T12:00:00Z"),
+      ),
+    ).toMatchObject({
+      last: feed.fetchedAt,
+      minutes: 0,
+      batches: 0,
+      state: "recent",
+    });
+    expect(
+      feedCoverage(
+        { ...feed, fetchedAt: "2026-11-08T14:00:00Z" },
+        "2026-11-08",
+        "2026-11-08",
+        Date.parse("2026-11-08T12:00:00Z"),
+      ),
+    ).toMatchObject({ last: null, state: "unknown" });
+  });
   it("usa somente o texto coletado e distingue menção nacional de local", () => {
     const event = {
       ...demoEvents[0]!,

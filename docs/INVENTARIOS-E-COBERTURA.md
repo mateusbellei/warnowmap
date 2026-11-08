@@ -20,6 +20,6 @@ Razões de seleção, situação inferida, explicações econômicas, atores e c
 
 ## Coleta e lacunas
 
-A interface substitui Feed conectado por um estado relacionado à coleta. O cartão de cobertura destaca o último sucesso conhecido, horário UTC e idade, junto das lacunas do período solicitado. O relógio acompanha o temporizador da página. Mais de uma hora sem sucesso indica desatualização, mesmo se o snapshot ainda estiver rotulado live. Falha na consulta automática mantém os dados e é sinalizada.
+A interface substitui Feed conectado por um estado relacionado à coleta. O cartão de cobertura destaca a última coleta registrada, horário UTC e idade, junto das lacunas do período solicitado. O relógio é sincronizado quando o feed chega e acompanha o temporizador da página; tolera até um minuto de desvio no horário registrado, mas não inclui lotes futuros na cobertura. Mais de uma hora sem coleta indica desatualização, mesmo se o snapshot ainda estiver rotulado live. Falha na consulta automática mantém os dados e é sinalizada.
 
 Lotes com contexto são contados por janelas únicas de 15 minutos dentro do recorte e até o horário atual; dias com algum registro não são apresentados como dias completos. A completude do contexto do lote atual não implica cobertura histórica de todo o mês. O detalhamento mostra janelas esperadas e registradas. Ausência de lotes não indica ausência de conflitos. Persistência temporária recebe aviso próprio. Nenhuma observação retroativa é inventada e nenhum banco é provisionado.

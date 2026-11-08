@@ -43,7 +43,7 @@ const age = computed(() =>
           feed?.mode === "demo"
             ? "Demonstração · sem coleta ao vivo"
             : info.last
-              ? "Última coleta bem-sucedida"
+              ? "Última coleta registrada"
               : "Sem coleta confirmada"
         }}</strong
         ><span v-if="info.last && feed?.mode !== 'demo'"

@@ -37,10 +37,15 @@ export function feedCoverage(
   );
   const last =
     [
-      feed?.operation?.lastSuccessAt,
       feed?.coverage?.lastCollectedAt,
+      feed?.operation?.lastSuccessAt,
       feed?.fetchedAt,
-    ].find((date) => date && valid(date)) ?? null;
+    ].find(
+      (date) =>
+        date &&
+        Number.isFinite(Date.parse(date)) &&
+        Date.parse(date) <= now + 60000,
+    ) ?? null;
   const minutes = last
     ? Math.max(0, Math.floor((now - Date.parse(last)) / 60000))
     : null;
