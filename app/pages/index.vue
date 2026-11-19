@@ -1205,6 +1205,7 @@ onBeforeUnmount(() => {
                   </div></template
                 ></ClientOnly
               >
+              <MapNewsLoading v-if="loading" :updating="events.length > 0" />
               <div class="map-topline">
                 <button
                   class="country-open-control"
